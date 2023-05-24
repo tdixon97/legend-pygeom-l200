@@ -20,7 +20,8 @@ def dump_gdml_cli() -> None:
 
     # global options
     parser.add_argument(
-        "--version", action="store_true", help="""Print pygama version and exit"""
+        "--version", action="version", help="""Print %(prog)s version and exit""",
+        version=_version.__version__  # noqa: T201
     )
     parser.add_argument(
         "--verbose",
@@ -45,12 +46,8 @@ def dump_gdml_cli() -> None:
 
     if args.verbose:
         logging.getLogger("l200geom").setLevel(logging.DEBUG)
-    elif args.debug:
+    if args.debug:
         logging.root.setLevel(logging.DEBUG)
-
-    if args.version:
-        print(version.__version__)  # noqa: T201
-        sys.exit()
 
     log.info(f"exporting GDML geometry to {args.filename}")
     w = gdml.Writer()
