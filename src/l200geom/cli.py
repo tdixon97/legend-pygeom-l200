@@ -6,7 +6,7 @@ import sys
 
 from pyg4ometry import gdml
 
-from . import version
+from . import _version
 from .core import construct
 
 log = logging.getLogger(__name__)
