@@ -22,7 +22,7 @@ def dump_gdml_cli() -> None:
         "--version",
         action="version",
         help="""Print %(prog)s version and exit""",
-        version=_version.__version__  # noqa: T201
+        version=_version.__version__,  # noqa: T201
     )
     parser.add_argument(
         "--verbose",
@@ -35,6 +35,12 @@ def dump_gdml_cli() -> None:
         "-d",
         action="store_true",
         help="""Increase the program verbosity to maximum""",
+    )
+    parser.add_argument(
+        "--visualize",
+        "-V",
+        action="store_true",
+        help="""Open a VTK visualization of the generated geometry""",
     )
 
     parser.add_argument(
@@ -52,5 +58,15 @@ def dump_gdml_cli() -> None:
 
     log.info(f"exporting GDML geometry to {args.filename}")
     w = gdml.Writer()
-    w.addDetector(construct())
+    registry = construct()
+    w.addDetector(registry)
     w.write(args.filename)
+
+    if args.visualize:
+        log.info("visualizing...")
+        from pyg4ometry import visualisation
+
+        v = visualisation.VtkViewer()
+        v.addLogicalVolume(registry.worldVolume)
+        v.addAxes(length=5000)
+        v.view()
