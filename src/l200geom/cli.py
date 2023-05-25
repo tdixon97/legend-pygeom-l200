@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 
 from pyg4ometry import gdml
 
@@ -20,7 +19,9 @@ def dump_gdml_cli() -> None:
 
     # global options
     parser.add_argument(
-        "--version", action="version", help="""Print %(prog)s version and exit""",
+        "--version",
+        action="version",
+        help="""Print %(prog)s version and exit""",
         version=_version.__version__  # noqa: T201
     )
     parser.add_argument(
