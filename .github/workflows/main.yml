@@ -37,7 +37,6 @@ jobs:
       run: |
         echo "LEGEND_METADATA=$GITHUB_WORKSPACE/legend-metadata" >> $GITHUB_ENV
     - name: Clone legend-metadata
-      if: github.event_name != 'pull_request'
       uses: actions/checkout@v3
       with:
         repository: legend-exp/legend-metadata
@@ -64,7 +63,6 @@ jobs:
         run: |
           echo "LEGEND_METADATA=$GITHUB_WORKSPACE/legend-metadata" >> $GITHUB_ENV
       - name: Clone legend-metadata
-        if: github.event_name != 'pull_request'
         uses: actions/checkout@v3
         with:
           repository: legend-exp/legend-metadata
