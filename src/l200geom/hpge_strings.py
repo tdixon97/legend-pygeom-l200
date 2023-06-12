@@ -1,0 +1,101 @@
+from __future__ import annotations
+
+import json
+import math
+
+from legendhpges import make_hpge
+from legendmeta.jsondb import AttrsDict
+from pyg4ometry import geant4
+
+
+def place_hpge_strings(
+    channelmap: str | dict | AttrsDict,
+    string_config: str | dict | AttrsDict,
+    z0: float,
+    mothervolume: geant4.LogicalVolume,
+    registry: geant4.Registry,
+) -> None:
+    """Construct LEGEND-200 HPGe strings.
+
+    Parameters
+    ----------
+    channelmap
+        LEGEND-200 HPGe channel map containing germanium detectors
+        configuration in the string and their geometry.
+    string_config
+        LEGEND-200 germanium detector string configuration file.
+        Used to reconstruct the spatial position of each string.
+    z0
+        The position of the top most slot of the strings in the z-axis.
+    mothervolume
+        pyg4ometry Geant4 LogicalVolume instance in which the strings
+        are to be placed.
+    registry
+        pyg4ometry Geant4 registry instance.
+    """
+    if registry is None:
+        raise ValueError("registry cannot be None")
+
+    if channelmap is None:
+        raise ValueError("configuration metadata file cannot be None")
+
+    if string_config is None:
+        raise ValueError("string configuration cannot be None")
+
+    if not isinstance(channelmap, (dict, AttrsDict)):
+        with open(channelmap) as jfile:
+            ch_map = AttrsDict(json.load(jfile))
+    else:
+        ch_map = AttrsDict(channelmap)
+
+    if not isinstance(string_config, (dict, AttrsDict)):
+        with open(string_config) as jfile:
+            hpge_string_config = AttrsDict(json.load(jfile))
+    else:
+        hpge_string_config = AttrsDict(string_config)
+
+    def _sin(a):
+        return math.sin(math.pi * a / 180)
+
+    def _cos(a):
+        return math.cos(math.pi * a / 180)
+    
+    ch_map = ch_map.map("system", unique=False).geds.values()
+    
+    for hpge_meta in ch_map:
+
+        #Temporary fix for gedet with null enrichment value
+        if hpge_meta.production.enrichment == None:
+            continue
+
+        hpge_string_id = str(hpge_meta.location.string)
+        hpge_unit_id_in_string = hpge_meta.location.position
+
+        x_pos = hpge_string_config.hpge_string[hpge_string_id].radius_in_mm * _cos(
+            hpge_string_config.hpge_string[hpge_string_id].angle_in_deg
+        )
+
+        y_pos = hpge_string_config.hpge_string[hpge_string_id].radius_in_mm * _sin(
+            hpge_string_config.hpge_string[hpge_string_id].angle_in_deg
+        )
+
+        z_pos = (
+            z0
+            - sum(hpge_string_config.hpge_string[hpge_string_id].hpge_unit_heights_in_mm[: hpge_unit_id_in_string - 1])
+            - hpge_string_config.hpge_string[hpge_string_id].hpge_unit_heights_in_mm[hpge_unit_id_in_string - 1] / 2
+        )
+        
+        hpge = make_hpge(hpge_meta, registry)
+
+        geant4.PhysicalVolume(
+            [
+                0,
+                0,
+                0,
+            ],
+            [x_pos, y_pos, z_pos],
+            hpge,
+            hpge_meta.name,
+            mothervolume,
+            registry,
+        )
