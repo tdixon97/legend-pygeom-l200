@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import pathlib
+from importlib import resources
 
-from legendmeta import LegendMetadata
+from legendmeta import JsonDB, LegendMetadata
 from pyg4ometry import geant4
 
-from . import cryo, gearray, materials
+from . import cryo, hpge_strings, materials
 
 lmeta = LegendMetadata()
-config = pathlib.Path(__file__).parent.resolve() / "configs"
+configs = JsonDB(resources.files("l200geom") / "configs")
 
 
 def construct() -> geant4.Registry:
@@ -33,10 +33,9 @@ def construct() -> geant4.Registry:
     cryo.place_argon(lar_lv, cryostat_lv, coordinate_z_displacement, reg)
 
     # Place the germanium detector array inside the liquid argon
-    metadata = lmeta.hardware.detectors.germanium.diodes
-    temp_ch_map = lmeta.hardware.configuration.channelmaps[r"l200-p03-r%-T%-all-config"]
-    temp_array_config = config / "dummy_array_config.json"
+    ge_channelmap = lmeta.channelmap("20230311T235840Z")
+    ge_string_config = configs.on("20230311T235840Z")
 
-    gearray.place_gearray(metadata, temp_array_config, temp_ch_map, 1950, lar_lv, reg)
+    hpge_strings.place_hpge_strings(ge_channelmap, ge_string_config, 1950, lar_lv, reg)
 
     return reg
