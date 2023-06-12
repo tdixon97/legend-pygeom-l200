@@ -33,9 +33,11 @@ def construct() -> geant4.Registry:
     cryo.place_argon(lar_lv, cryostat_lv, coordinate_z_displacement, reg)
 
     # Place the germanium detector array inside the liquid argon
-    ge_channelmap = lmeta.channelmap("20230311T235840Z")
-    ge_string_config = configs.on("20230311T235840Z")
+    hpge_channelmap = lmeta.channelmap("20230311T235840Z")
+    hpge_string_config = configs.on("20230311T235840Z")
 
-    hpge_strings.place_hpge_strings(ge_channelmap, ge_string_config, 1950, lar_lv, reg)
+    hpge_strings.place_hpge_strings(
+        hpge_channelmap, hpge_string_config, 1950, lar_lv, reg
+    )
 
     return reg

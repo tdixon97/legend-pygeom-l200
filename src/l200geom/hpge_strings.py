@@ -54,37 +54,31 @@ def place_hpge_strings(
     else:
         hpge_string_config = AttrsDict(string_config)
 
-    def _sin(a):
-        return math.sin(math.pi * a / 180)
-
-    def _cos(a):
-        return math.cos(math.pi * a / 180)
-    
     ch_map = ch_map.map("system", unique=False).geds.values()
-    
-    for hpge_meta in ch_map:
 
-        #Temporary fix for gedet with null enrichment value
-        if hpge_meta.production.enrichment == None:
+    for hpge_meta in ch_map:
+        # Temporary fix for gedet with null enrichment value
+        if hpge_meta.production.enrichment is None:
             continue
 
         hpge_string_id = str(hpge_meta.location.string)
+        hpge_string = hpge_string_config.hpge_string[hpge_string_id]
         hpge_unit_id_in_string = hpge_meta.location.position
 
-        x_pos = hpge_string_config.hpge_string[hpge_string_id].radius_in_mm * _cos(
-            hpge_string_config.hpge_string[hpge_string_id].angle_in_deg
+        x_pos = hpge_string.radius_in_mm * math.cos(
+            math.pi * hpge_string.angle_in_deg / 180
         )
 
-        y_pos = hpge_string_config.hpge_string[hpge_string_id].radius_in_mm * _sin(
-            hpge_string_config.hpge_string[hpge_string_id].angle_in_deg
+        y_pos = hpge_string.radius_in_mm * math.sin(
+            math.pi * hpge_string.angle_in_deg / 180
         )
 
         z_pos = (
             z0
-            - sum(hpge_string_config.hpge_string[hpge_string_id].hpge_unit_heights_in_mm[: hpge_unit_id_in_string - 1])
-            - hpge_string_config.hpge_string[hpge_string_id].hpge_unit_heights_in_mm[hpge_unit_id_in_string - 1] / 2
+            - sum(hpge_string.hpge_unit_heights_in_mm[: hpge_unit_id_in_string - 1])
+            - hpge_string.hpge_unit_heights_in_mm[hpge_unit_id_in_string - 1] / 2
         )
-        
+
         hpge = make_hpge(hpge_meta, registry)
 
         geant4.PhysicalVolume(
