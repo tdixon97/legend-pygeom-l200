@@ -6,13 +6,12 @@ import pyg4ometry.geant4 as g4
 
 
 class OpticalMaterialRegistry:
-    _elements = {}
-    _elements_cb = {}
-
     def __init__(self, reg: g4.Registry):
         self.g4_registry = reg
         self.lar_temperature = 88.8
         self._define_elements()
+        self._elements = {}
+        self._elements_cb = {}
 
     def get_element(self, symbol: str) -> g4.Element:
         if (symbol in self._elements_cb) and (symbol not in self._elements):
