@@ -9,9 +9,10 @@ class OpticalMaterialRegistry:
     def __init__(self, reg: g4.Registry):
         self.g4_registry = reg
         self.lar_temperature = 88.8
-        self._define_elements()
+
         self._elements = {}
         self._elements_cb = {}
+        self._define_elements()
 
     def get_element(self, symbol: str) -> g4.Element:
         if (symbol in self._elements_cb) and (symbol not in self._elements):
