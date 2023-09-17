@@ -5,7 +5,7 @@ from importlib import resources
 from legendmeta import JsonDB, LegendMetadata
 from pyg4ometry import geant4
 
-from . import cryo, hpge_strings, materials
+from . import cryo, hpge_strings, materials, wlsr
 
 lmeta = LegendMetadata()
 configs = JsonDB(resources.files("l200geom") / "configs")
@@ -31,6 +31,17 @@ def construct() -> geant4.Registry:
 
     lar_lv = cryo.construct_argon(mats.liquidargon, reg)
     cryo.place_argon(lar_lv, cryostat_lv, coordinate_z_displacement, reg)
+
+    # Place the WLSR into the cryostat.
+    wlsr_lvs = wlsr.construct_wlsr(
+        mats.metal_copper,
+        mats.tetratex,
+        mats.tpb_on_tetratex,
+        reg,
+    )
+    wlsr.place_wlsr(*wlsr_lvs, lar_lv, 3 * 180, reg)
+    # TODO: implement and enable optical surfaces.
+    # wlsr.add_surfaces_wlsr(*wlsr_lvs[1:], lar_lv, mats, reg)
 
     # Place the germanium detector array inside the liquid argon
     hpge_channelmap = lmeta.channelmap("20230311T235840Z")
