@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import legendoptics.fibers
+import legendoptics.lar
+import legendoptics.tpb
+import pint
 import pyg4ometry.geant4 as g4
 
 
@@ -62,6 +66,22 @@ class OpticalMaterialRegistry:
         )
         self._liquidargon.add_element_natoms(self.get_element("Ar"), natoms=1)
 
+        u = pint.get_application_registry().get()
+        legendoptics.lar.pyg4_lar_attach_rindex(
+            self._liquidargon,
+            self.g4_registry,
+        )
+        legendoptics.lar.pyg4_lar_attach_attenuation(
+            self._liquidargon,
+            self.g4_registry,
+            self.lar_temperature * u.K,
+        )
+        legendoptics.lar.pyg4_lar_attach_scintillation(
+            self._liquidargon,
+            self.g4_registry,
+            triplet_lifetime_method="legend200-llama",
+        )
+
         return self._liquidargon
 
     @property
@@ -93,3 +113,168 @@ class OpticalMaterialRegistry:
         )
 
         return self._metal_steel
+
+    @property
+    def metal_silicon(self) -> g4.Material:
+        """Silicon."""
+        if hasattr(self, "_metal_silicon"):
+            return self._metal_silicon
+
+        self._metal_silicon = g4.Material(
+            name="metal_silicon",
+            density=2.330,
+            number_of_components=5,
+            registry=self.g4_registry,
+        )
+        self._metal_silicon.add_element_natoms(self.get_element("Si"), natoms=1)
+
+        return self._metal_silicon
+
+    @property
+    def metal_copper(self) -> g4.Material:
+        """Copper structures."""
+        if hasattr(self, "_metal_copper"):
+            return self._metal_copper
+
+        self._metal_copper = g4.Material(
+            name="metal_copper",
+            density=8.960,
+            number_of_components=1,
+            registry=self.g4_registry,
+        )
+        self._metal_copper.add_element_natoms(self.get_element("Cu"), natoms=1)
+
+        return self._metal_copper
+
+    @property
+    def pmma(self) -> g4.Material:
+        """PMMA for the inner fiber cladding layer."""
+        if hasattr(self, "_pmma"):
+            return self._pmma
+
+        self._pmma = g4.Material(
+            name="pmma", density=1.2, number_of_components=3, registry=self.g4_registry
+        )
+        self._pmma.add_element_natoms(self.get_element("H"), natoms=8)
+        self._pmma.add_element_natoms(self.get_element("C"), natoms=5)
+        self._pmma.add_element_natoms(self.get_element("O"), natoms=2)
+
+        legendoptics.fibers.pyg4_fiber_cladding1_attach_rindex(
+            self._pmma,
+            self.g4_registry,
+        )
+
+        return self._pmma
+
+    @property
+    def pmma_out(self) -> g4.Material:
+        """PMMA for the outer fiber cladding layer."""
+        if hasattr(self, "_pmma_out"):
+            return self._pmma_out
+
+        self._pmma_out = g4.Material(
+            name="pmma_cl2",
+            density=1.2,
+            number_of_components=3,
+            registry=self.g4_registry,
+        )
+        self._pmma_out.add_element_natoms(self.get_element("H"), natoms=8)
+        self._pmma_out.add_element_natoms(self.get_element("C"), natoms=5)
+        self._pmma_out.add_element_natoms(self.get_element("O"), natoms=2)
+
+        legendoptics.fibers.pyg4_fiber_cladding2_attach_rindex(
+            self._pmma_out,
+            self.g4_registry,
+        )
+
+        return self._pmma_out
+
+    @property
+    def ps_fibers(self) -> g4.Material:
+        """Polystrene for the fiber core."""
+        if hasattr(self, "_ps_fibers"):
+            return self._ps_fibers
+
+        self._ps_fibers = g4.Material(
+            name="ps_fibers",
+            density=1.05,
+            number_of_components=2,
+            registry=self.g4_registry,
+        )
+        self._ps_fibers.add_element_natoms(self.get_element("H"), natoms=8)
+        self._ps_fibers.add_element_natoms(self.get_element("C"), natoms=8)
+
+        legendoptics.fibers.pyg4_fiber_core_attach_rindex(
+            self._ps_fibers,
+            self.g4_registry,
+        )
+        legendoptics.fibers.pyg4_fiber_core_attach_absorption(
+            self._ps_fibers,
+            self.g4_registry,
+        )
+        legendoptics.fibers.pyg4_fiber_core_attach_wls(
+            self._ps_fibers,
+            self.g4_registry,
+        )
+
+        return self._ps_fibers
+
+    def _tpb(self, name: str) -> g4.Material:
+        t = g4.Material(
+            name=name,
+            density=1.08,
+            number_of_components=2,
+            state="solid",
+            registry=self.g4_registry,
+        )
+        t.add_element_natoms(self.get_element("H"), natoms=22)
+        t.add_element_natoms(self.get_element("C"), natoms=28)
+
+        legendoptics.tpb.pyg4_tpb_attach_rindex(t, self.g4_registry)
+        legendoptics.tpb.pyg4_tpb_attach_wls(t, self.g4_registry)
+
+        return t
+
+    @property
+    def tpb_on_fibers(self) -> g4.Material:
+        """Tetraphenyl-butadiene wavelength shifter (evaporated on fibers)."""
+        if hasattr(self, "_tpb_on_fibers"):
+            return self._tpb_on_fibers
+
+        self._tpb_on_fibers = self._tpb("tpb_on_fibers")
+
+        return self._tpb_on_fibers
+
+    @property
+    def tpb_on_tetratex(self) -> g4.Material:
+        """Tetraphenyl-butadiene wavelength shifter (evaporated on Tetratex)."""
+        if hasattr(self, "_tpb_on_tetratex"):
+            return self._tpb_on_tetratex
+
+        self._tpb_on_tetratex = self._tpb("tpb_on_tetratex")
+
+        return self._tpb_on_tetratex
+
+    @property
+    def tetratex(self) -> g4.Material:
+        """Tetratex diffuse reflector.
+
+        .. warning:: For full optics support, a reflective surface is needed.
+        """
+        if hasattr(self, "_tetratex"):
+            return self._tetratex
+
+        self._tetratex = g4.Material(
+            name="tetratex",
+            density=0.35,
+            number_of_components=2,
+            registry=self.g4_registry,
+        )
+        self._tetratex.add_element_massfraction(
+            self.get_element("F"), massfraction=0.76
+        )
+        self._tetratex.add_element_massfraction(
+            self.get_element("C"), massfraction=0.24
+        )
+
+        return self._tetratex
