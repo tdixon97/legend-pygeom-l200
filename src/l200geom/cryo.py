@@ -25,9 +25,7 @@ cryo_access_height = 1720
 access_overlap = 200
 
 
-def construct_cryostat(
-    cryostat_material: g4.Material, reg: g4.Registry
-) -> g4.LogicalVolume:
+def construct_cryostat(cryostat_material: g4.Material, reg: g4.Registry) -> g4.LogicalVolume:
     cryo_top = g4.solid.Tubs(
         "cryo_top",
         0,
@@ -58,16 +56,10 @@ def construct_cryostat(
         reg,
         "mm",
     )
-    cryo_tub = g4.solid.Tubs(
-        "cryo_tub", 0, cryo_radius + cryo_wall, cryo_tub_height, 0, 2 * pi, reg, "mm"
-    )
+    cryo_tub = g4.solid.Tubs("cryo_tub", 0, cryo_radius + cryo_wall, cryo_tub_height, 0, 2 * pi, reg, "mm")
 
-    cryo1 = g4.solid.Union(
-        "cryo1", cryo_tub, cryo_top, [[0, 0, 0], [0, 0, cryo_tub_height / 2]], reg
-    )
-    cryo2 = g4.solid.Union(
-        "cryo2", cryo1, cryo_bottom, [[0, pi, 0], [0, 0, -cryo_tub_height / 2]], reg
-    )
+    cryo1 = g4.solid.Union("cryo1", cryo_tub, cryo_top, [[0, 0, 0], [0, 0, cryo_tub_height / 2]], reg)
+    cryo2 = g4.solid.Union("cryo2", cryo1, cryo_bottom, [[0, pi, 0], [0, 0, -cryo_tub_height / 2]], reg)
     cryo = g4.solid.Union(
         "cryostat",
         cryo2,
@@ -127,16 +119,10 @@ def construct_argon(lar_material: g4.Material, reg: g4.Registry) -> g4.LogicalVo
         reg,
         "mm",
     )
-    lar_tub = g4.solid.Tubs(
-        "lar_tub", 0, cryo_radius, cryo_tub_height, 0, 2 * pi, reg, "mm"
-    )
+    lar_tub = g4.solid.Tubs("lar_tub", 0, cryo_radius, cryo_tub_height, 0, 2 * pi, reg, "mm")
 
-    lar1 = g4.solid.Union(
-        "lar1", lar_tub, lar_top, [[0, 0, 0], [0, 0, cryo_tub_height / 2]], reg
-    )
-    lar2 = g4.solid.Union(
-        "lar2", lar1, lar_bottom, [[0, pi, 0], [0, 0, -cryo_tub_height / 2]], reg
-    )
+    lar1 = g4.solid.Union("lar1", lar_tub, lar_top, [[0, 0, 0], [0, 0, cryo_tub_height / 2]], reg)
+    lar2 = g4.solid.Union("lar2", lar1, lar_bottom, [[0, pi, 0], [0, 0, -cryo_tub_height / 2]], reg)
     lar = g4.solid.Union(
         "lar",
         lar2,
@@ -158,7 +144,5 @@ def place_argon(
     cryostat_displacement_z: float,
     reg: g4.Registry,
 ) -> g4.PhysicalVolume:
-    lar_pv = g4.PhysicalVolume(
-        [0, 0, 0], [0, 0, cryostat_displacement_z], lar_lv, "lar", cryostat_lv, reg
-    )
+    lar_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, cryostat_displacement_z], lar_lv, "lar", cryostat_lv, reg)
     return lar_pv

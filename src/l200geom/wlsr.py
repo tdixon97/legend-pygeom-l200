@@ -21,9 +21,7 @@ def construct_wlsr(
     wlsr_outer_diameter = 1400 / 2  # (Patrick)
     wlsr_tpb_diameter = 1374 / 2
     wlsr_tpb_thickness = 600 * 1e-6  # 600nm of TPB coating (arXiv:2112.06675)
-    wlsr_thickness = (
-        wlsr_outer_diameter - wlsr_tpb_diameter - wlsr_tpb_thickness
-    ) / 2  # dummy
+    wlsr_thickness = (wlsr_outer_diameter - wlsr_tpb_diameter - wlsr_tpb_thickness) / 2  # dummy
     wlsr_height = 3000
     wlsr_outer = g4.solid.Tubs(
         "wlsr_outer",
@@ -74,12 +72,8 @@ def place_wlsr(
     wlsr_outer_pv = g4.PhysicalVolume(
         [0, 0, 0], [0, 0, z_displacement], wlsr_outer_lv, "wlsr_outer", mother_lv, reg
     )
-    wlsr_ttx_pv = g4.PhysicalVolume(
-        [0, 0, 0], [0, 0, 0], wlsr_ttx_lv, "wlsr_ttx", wlsr_outer_lv, reg
-    )
-    wlsr_tpb_pv = g4.PhysicalVolume(
-        [0, 0, 0], [0, 0, 0], wlsr_tpb_lv, "wlsr_tpb", wlsr_ttx_lv, reg
-    )
+    wlsr_ttx_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, 0], wlsr_ttx_lv, "wlsr_ttx", wlsr_outer_lv, reg)
+    wlsr_tpb_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, 0], wlsr_tpb_lv, "wlsr_tpb", wlsr_ttx_lv, reg)
 
     return wlsr_outer_pv, wlsr_ttx_pv, wlsr_tpb_pv
 
@@ -94,13 +88,7 @@ def add_surfaces_wlsr(
     raise NotImplementedError("WLSR optical surfaces not implemented yet!")
 
     # between TPB and TTX, only one surface should be enough.
-    g4.BorderSurface(
-        "bsurface_tpb_ttx", wlsr_tpb_pv, wlsr_ttx_pv, mats.surface_tpb_ttx, reg
-    )
+    g4.BorderSurface("bsurface_tpb_ttx", wlsr_tpb_pv, wlsr_ttx_pv, mats.surface_tpb_ttx, reg)
     # between LAr and TPB we need a surface in both directions.
-    g4.BorderSurface(
-        "bsurface_wlsr_tpb_lar", mother_pv, wlsr_tpb_pv, mats.surface_lar2tpb, reg
-    )
-    g4.BorderSurface(
-        "bsurface_wlsr_lar_tpb", wlsr_tpb_pv, mother_pv, mats.surface_lar2tpb, reg
-    )
+    g4.BorderSurface("bsurface_wlsr_tpb_lar", mother_pv, wlsr_tpb_pv, mats.surface_lar2tpb, reg)
+    g4.BorderSurface("bsurface_wlsr_lar_tpb", wlsr_tpb_pv, mother_pv, mats.surface_lar2tpb, reg)
