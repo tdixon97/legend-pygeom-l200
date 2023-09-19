@@ -37,18 +37,20 @@ def place_fiber_modules(
         assert mod[ch.location.position] is None
         mod[ch.location.position] = ch.name
 
-    ob_factory = ModuleFactorySegment(
+    factory = ModuleFactorySegment  # or ModuleFactorySingleFibers
+
+    ob_factory = factory(
         radius_mm=590 / 2,
         fiber_length_mm=1900,
-        fiber_count_per_module=10,
+        fiber_count_per_module=90,
         number_of_modules=20,
         registry=registry,
         materials=materials,
     )
-    ib_factory = ModuleFactorySegment(
+    ib_factory = factory(
         radius_mm=269 / 2,
         fiber_length_mm=1400,
-        fiber_count_per_module=10,
+        fiber_count_per_module=90,
         number_of_modules=9,
         registry=registry,
         materials=materials,
@@ -299,6 +301,8 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
             [0, 0, 0], [0, 0, 0], self.fiber_cl2_lv, f"fiber_cl2{v_suffix}", coating_lv, self.registry
         )
 
+        coating_lv.pygeom_color_rgba = [0, 1, 0, 1]
+
         return coating_lv
 
     def create_module(
@@ -438,6 +442,8 @@ class ModuleFactorySegment(ModuleFactoryBase):
             coating_lv,
             self.registry,
         )
+
+        coating_lv.pygeom_color_rgba = [0, 1, 0, 1]
 
         return coating_lv
 

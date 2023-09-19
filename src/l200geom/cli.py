@@ -64,9 +64,6 @@ def dump_gdml_cli() -> None:
 
     if args.visualize:
         log.info("visualizing...")
-        from pyg4ometry import visualisation
+        from . import vis_utils
 
-        v = visualisation.VtkViewer()
-        v.addLogicalVolume(registry.worldVolume)
-        v.addAxes(length=5000)
-        v.view()
+        vis_utils.visualize(registry)

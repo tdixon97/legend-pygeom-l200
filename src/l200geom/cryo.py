@@ -84,6 +84,7 @@ def place_cryostat(
     cryostat_pv = g4.PhysicalVolume(
         [0, 0, 0], [0, 0, cryostat_displacement_z], cryostat_lv, "cryostat", wl, reg
     )
+    cryostat_lv.pygeom_color_rgba = False
     return cryostat_pv
 
 
@@ -145,4 +146,5 @@ def place_argon(
     reg: g4.Registry,
 ) -> g4.PhysicalVolume:
     lar_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, cryostat_displacement_z], lar_lv, "lar", cryostat_lv, reg)
+    lar_lv.pygeom_color_rgba = [0, 0, 0, 0.1]
     return lar_pv
