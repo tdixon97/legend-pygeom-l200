@@ -8,15 +8,19 @@ import legendoptics.tpb
 import pint
 import pyg4ometry.geant4 as g4
 
+from .surfaces import OpticalSurfaceRegistry
+
 
 class OpticalMaterialRegistry:
-    def __init__(self, reg: g4.Registry):
-        self.g4_registry = reg
+    def __init__(self, g4_registry: g4.Registry):
+        self.g4_registry = g4_registry
         self.lar_temperature = 88.8
 
         self._elements = {}
         self._elements_cb = {}
         self._define_elements()
+
+        self.surfaces = OpticalSurfaceRegistry(g4_registry)
 
     def get_element(self, symbol: str) -> g4.Element:
         if (symbol in self._elements_cb) and (symbol not in self._elements):
@@ -120,7 +124,11 @@ class OpticalMaterialRegistry:
 
     @property
     def metal_copper(self) -> g4.Material:
-        """Copper structures."""
+        """Copper structures.
+
+        .. warning:: For full optics support, a reflective surface is needed, see
+            :py:func:`surfaces.OpticalSurfaceRegistry.to_copper`.
+        """
         if hasattr(self, "_metal_copper"):
             return self._metal_copper
 
@@ -245,7 +253,8 @@ class OpticalMaterialRegistry:
     def tetratex(self) -> g4.Material:
         """Tetratex diffuse reflector.
 
-        .. warning:: For full optics support, a reflective surface is needed.
+        .. warning:: For full optics support, a reflective surface is needed, see
+            :py:func:`surfaces.OpticalSurfaceRegistry.wlsr_tpb_to_tetratex`.
         """
         if hasattr(self, "_tetratex"):
             return self._tetratex

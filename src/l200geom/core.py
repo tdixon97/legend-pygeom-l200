@@ -39,9 +39,8 @@ def construct() -> geant4.Registry:
         mats.tpb_on_tetratex,
         reg,
     )
-    wlsr.place_wlsr(*wlsr_lvs, lar_lv, 3 * 180, reg)
-    # TODO: implement and enable optical surfaces.
-    # wlsr.add_surfaces_wlsr(*wlsr_lvs[1:], lar_lv, mats, reg)
+    wlsr_pvs = wlsr.place_wlsr(*wlsr_lvs, lar_lv, 3 * 180, reg)
+    wlsr.add_surfaces_wlsr(*wlsr_pvs[1:], lar_lv, mats, reg)
 
     channelmap = lmeta.channelmap("20230311T235840Z")
 
