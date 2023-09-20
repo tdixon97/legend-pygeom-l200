@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import legendoptics.fibers
 import legendoptics.lar
+import legendoptics.nylon
+import legendoptics.pen
 import legendoptics.tpb
 import pint
 import pyg4ometry.geant4 as g4
@@ -269,3 +271,48 @@ class OpticalMaterialRegistry:
         self._tetratex.add_element_massfraction(self.get_element("C"), massfraction=0.24)
 
         return self._tetratex
+
+    @property
+    def nylon(self) -> g4.Material:
+        """Nylon (from Borexino)."""
+        if hasattr(self, "_nylon"):
+            return self._nylon
+
+        self._nylon = g4.Material(
+            name="nylon",
+            density=1.15,
+            number_of_components=4,
+            registry=self.g4_registry,
+        )
+        self._nylon.add_element_natoms(self.get_element("H"), natoms=2)
+        self._nylon.add_element_natoms(self.get_element("N"), natoms=2)
+        self._nylon.add_element_natoms(self.get_element("O"), natoms=3)
+        self._nylon.add_element_natoms(self.get_element("C"), natoms=13)
+
+        legendoptics.nylon.pyg4_nylon_attach_rindex(self._nylon, self.g4_registry)
+        legendoptics.nylon.pyg4_nylon_attach_absorption(self._nylon, self.g4_registry)
+
+        return self._nylon
+
+    @property
+    def pen(self) -> g4.Material:
+        """PEN wavelength-shifter and scintillator."""
+        if hasattr(self, "_pen"):
+            return self._pen
+
+        self._pen = g4.Material(
+            name="pen",
+            density=1.3,
+            number_of_components=3,
+            registry=self.g4_registry,
+        )
+        self._pen.add_element_natoms(self.get_element("C"), natoms=14)
+        self._pen.add_element_natoms(self.get_element("H"), natoms=10)
+        self._pen.add_element_natoms(self.get_element("O"), natoms=4)
+
+        legendoptics.pen.pyg4_pen_attach_rindex(self._pen, self.g4_registry)
+        legendoptics.pen.pyg4_pen_attach_attenuation(self._pen, self.g4_registry)
+        legendoptics.pen.pyg4_pen_attach_wls(self._pen, self.g4_registry)
+        legendoptics.pen.pyg4_pen_attach_scintillation(self._pen, self.g4_registry)
+
+        return self._pen
