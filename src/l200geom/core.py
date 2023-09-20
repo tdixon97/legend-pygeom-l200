@@ -11,7 +11,7 @@ lmeta = LegendMetadata()
 configs = JsonDB(resources.files("l200geom") / "configs")
 
 
-def construct() -> geant4.Registry:
+def construct(use_detailed_fiber_model: bool = False) -> geant4.Registry:
     """Construct the LEGEND-200 geometry and return the pyg4ometry Registry containing the world volume."""
     reg = geant4.Registry()
     mats = materials.OpticalMaterialRegistry(reg)
@@ -51,6 +51,6 @@ def construct() -> geant4.Registry:
 
     # build fiber modules
     fiber_modules = lmeta.hardware.detectors.lar.fibers
-    fibers.place_fiber_modules(fiber_modules, channelmap, lar_lv, mats, reg)
+    fibers.place_fiber_modules(fiber_modules, channelmap, lar_lv, mats, reg, use_detailed_fiber_model)
 
     return reg

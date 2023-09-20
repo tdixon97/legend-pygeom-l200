@@ -14,6 +14,7 @@ def place_fiber_modules(
     mother_lv: g4.LogicalVolume,
     materials: materials.OpticalMaterialRegistry,
     registry: g4.Registry,
+    use_detailed_fiber_model: bool = False,
 ) -> None:
     # Unroll the provided metadata into a structure better suited for the next steps.
     # The geometry here is based on physical modules and not on channels.
@@ -37,7 +38,7 @@ def place_fiber_modules(
         assert mod[ch.location.position] is None
         mod[ch.location.position] = ch.name
 
-    factory = ModuleFactorySegment  # or ModuleFactorySingleFibers
+    factory = ModuleFactorySingleFibers if use_detailed_fiber_model else ModuleFactorySegment
 
     ob_factory = factory(
         radius_mm=590 / 2,
