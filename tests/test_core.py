@@ -5,4 +5,5 @@ def test_import():
 def test_construct():
     import l200geom.core
 
-    l200geom.core.construct()
+    l200geom.core.construct(use_detailed_fiber_model=False)
+    l200geom.core.construct(use_detailed_fiber_model=True)
