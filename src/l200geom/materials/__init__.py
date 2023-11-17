@@ -187,7 +187,7 @@ class OpticalMaterialRegistry:
 
     @property
     def ps_fibers(self) -> g4.Material:
-        """Polystrene for the fiber core."""
+        """Polystyrene for the fiber core."""
         if hasattr(self, "_ps_fibers"):
             return self._ps_fibers
 
@@ -215,7 +215,7 @@ class OpticalMaterialRegistry:
 
         return self._ps_fibers
 
-    def _tpb(self, name: str) -> g4.Material:
+    def _tpb(self, name: str, **wls_opts) -> g4.Material:
         t = g4.Material(
             name=name,
             density=1.08,
@@ -227,7 +227,7 @@ class OpticalMaterialRegistry:
         t.add_element_natoms(self.get_element("C"), natoms=28)
 
         legendoptics.tpb.pyg4_tpb_attach_rindex(t, self.g4_registry)
-        legendoptics.tpb.pyg4_tpb_attach_wls(t, self.g4_registry)
+        legendoptics.tpb.pyg4_tpb_attach_wls(t, self.g4_registry, **wls_opts)
 
         return t
 
@@ -250,6 +250,26 @@ class OpticalMaterialRegistry:
         self._tpb_on_tetratex = self._tpb("tpb_on_tetratex")
 
         return self._tpb_on_tetratex
+
+    @property
+    def tpb_on_nylon(self) -> g4.Material:
+        """Tetraphenyl-butadiene wavelength shifter (in nylon matrix)."""
+        if hasattr(self, "_tpb_on_nylon"):
+            return self._tpb_on_nylon
+
+        # as a base, use the normal TPB properties.
+        self._tpb_on_nylon = self._tpb(
+            "tpb_on_nylon",
+            # For 30% TPB 70% PS the WLS light yield is reduced by 30% [Alexey]
+            quantum_efficiency=0.7 * legendoptics.tpb.tpb_quantum_efficiency(),
+            # the emission spectrum differs significantly.
+            emission_spectrum="polystyrene_matrix",
+        )
+
+        # add absorption length from nylon.
+        legendoptics.nylon.pyg4_nylon_attach_absorption(self._tpb_on_nylon, self.g4_registry)
+
+        return self._tpb_on_nylon
 
     @property
     def tetratex(self) -> g4.Material:
