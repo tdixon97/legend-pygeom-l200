@@ -22,7 +22,7 @@ def dump_gdml_cli() -> None:
         "--version",
         action="version",
         help="""Print %(prog)s version and exit""",
-        version=_version.__version__,  # noqa: T201
+        version=_version.__version__,
     )
     parser.add_argument(
         "--verbose",
@@ -66,7 +66,8 @@ def dump_gdml_cli() -> None:
     if args.debug:
         logging.root.setLevel(logging.DEBUG)
 
-    log.info(f"exporting GDML geometry to {args.filename}")
+    msg = f"exporting GDML geometry to {args.filename}"
+    log.info(msg)
     w = gdml.Writer()
     registry = construct(
         use_detailed_fiber_model=args.fiber_modules == "detailed",

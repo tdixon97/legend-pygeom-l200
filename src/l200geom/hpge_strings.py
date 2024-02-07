@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import math
+from pathlib import Path
 
 from legendhpges import make_hpge
-from legendmeta.jsondb import AttrsDict
+from legendmeta import AttrsDict
 from pyg4ometry import geant4
 
 
@@ -34,22 +35,25 @@ def place_hpge_strings(
         pyg4ometry Geant4 registry instance.
     """
     if registry is None:
-        raise ValueError("registry cannot be None")
+        msg = "registry cannot be None"
+        raise ValueError(msg)
 
     if channelmap is None:
-        raise ValueError("configuration metadata file cannot be None")
+        msg = "configuration metadata file cannot be None"
+        raise ValueError(msg)
 
     if string_config is None:
-        raise ValueError("string configuration cannot be None")
+        msg = "string configuration cannot be None"
+        raise ValueError(msg)
 
     if not isinstance(channelmap, (dict, AttrsDict)):
-        with open(channelmap) as jfile:
+        with Path(channelmap).open() as jfile:
             ch_map = AttrsDict(json.load(jfile))
     else:
         ch_map = AttrsDict(channelmap)
 
     if not isinstance(string_config, (dict, AttrsDict)):
-        with open(string_config) as jfile:
+        with Path(string_config).open() as jfile:
             hpge_string_config = AttrsDict(json.load(jfile))
     else:
         hpge_string_config = AttrsDict(string_config)
@@ -65,9 +69,13 @@ def place_hpge_strings(
         hpge_string = hpge_string_config.hpge_string[hpge_string_id]
         hpge_unit_id_in_string = hpge_meta.location.position
 
-        x_pos = hpge_string.radius_in_mm * math.cos(math.pi * hpge_string.angle_in_deg / 180)
+        x_pos = hpge_string.radius_in_mm * math.cos(
+            math.pi * hpge_string.angle_in_deg / 180
+        )
 
-        y_pos = hpge_string.radius_in_mm * math.sin(math.pi * hpge_string.angle_in_deg / 180)
+        y_pos = hpge_string.radius_in_mm * math.sin(
+            math.pi * hpge_string.angle_in_deg / 180
+        )
 
         z_pos = (
             z0
