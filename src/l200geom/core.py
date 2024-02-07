@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from importlib import resources
 
-from legendmeta import LegendMetadata, TextDB
+from legendmeta import JsonDB, LegendMetadata
 from pyg4ometry import geant4
 
 from . import cryo, fibers, hpge_strings, materials, wlsr
 
 lmeta = LegendMetadata()
-configs = TextDB(resources.files("l200geom") / "configs")
+configs = JsonDB(resources.files("l200geom") / "configs")
 
 
 def construct(use_detailed_fiber_model: bool = False) -> geant4.Registry:
@@ -51,8 +51,6 @@ def construct(use_detailed_fiber_model: bool = False) -> geant4.Registry:
 
     # build fiber modules
     fiber_modules = lmeta.hardware.detectors.lar.fibers
-    fibers.place_fiber_modules(
-        fiber_modules, channelmap, lar_lv, mats, reg, use_detailed_fiber_model
-    )
+    fibers.place_fiber_modules(fiber_modules, channelmap, lar_lv, mats, reg, use_detailed_fiber_model)
 
     return reg

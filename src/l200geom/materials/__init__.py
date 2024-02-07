@@ -100,21 +100,11 @@ class OpticalMaterialRegistry:
             number_of_components=5,
             registry=self.g4_registry,
         )
-        self._metal_steel.add_element_massfraction(
-            self.get_element("Si"), massfraction=0.01
-        )
-        self._metal_steel.add_element_massfraction(
-            self.get_element("Cr"), massfraction=0.20
-        )
-        self._metal_steel.add_element_massfraction(
-            self.get_element("Mn"), massfraction=0.02
-        )
-        self._metal_steel.add_element_massfraction(
-            self.get_element("Fe"), massfraction=0.67
-        )
-        self._metal_steel.add_element_massfraction(
-            self.get_element("Ni"), massfraction=0.10
-        )
+        self._metal_steel.add_element_massfraction(self.get_element("Si"), massfraction=0.01)
+        self._metal_steel.add_element_massfraction(self.get_element("Cr"), massfraction=0.20)
+        self._metal_steel.add_element_massfraction(self.get_element("Mn"), massfraction=0.02)
+        self._metal_steel.add_element_massfraction(self.get_element("Fe"), massfraction=0.67)
+        self._metal_steel.add_element_massfraction(self.get_element("Ni"), massfraction=0.10)
 
         return self._metal_steel
 
@@ -160,9 +150,7 @@ class OpticalMaterialRegistry:
         if hasattr(self, "_pmma"):
             return self._pmma
 
-        self._pmma = g4.Material(
-            name="pmma", density=1.2, number_of_components=3, registry=self.g4_registry
-        )
+        self._pmma = g4.Material(name="pmma", density=1.2, number_of_components=3, registry=self.g4_registry)
         self._pmma.add_element_natoms(self.get_element("H"), natoms=8)
         self._pmma.add_element_natoms(self.get_element("C"), natoms=5)
         self._pmma.add_element_natoms(self.get_element("O"), natoms=2)
@@ -279,9 +267,7 @@ class OpticalMaterialRegistry:
         )
 
         # add absorption length from nylon.
-        legendoptics.nylon.pyg4_nylon_attach_absorption(
-            self._tpb_on_nylon, self.g4_registry
-        )
+        legendoptics.nylon.pyg4_nylon_attach_absorption(self._tpb_on_nylon, self.g4_registry)
 
         return self._tpb_on_nylon
 
@@ -301,12 +287,8 @@ class OpticalMaterialRegistry:
             number_of_components=2,
             registry=self.g4_registry,
         )
-        self._tetratex.add_element_massfraction(
-            self.get_element("F"), massfraction=0.76
-        )
-        self._tetratex.add_element_massfraction(
-            self.get_element("C"), massfraction=0.24
-        )
+        self._tetratex.add_element_massfraction(self.get_element("F"), massfraction=0.76)
+        self._tetratex.add_element_massfraction(self.get_element("C"), massfraction=0.24)
 
         return self._tetratex
 

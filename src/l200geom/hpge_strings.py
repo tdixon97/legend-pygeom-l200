@@ -5,7 +5,7 @@ import math
 from pathlib import Path
 
 from legendhpges import make_hpge
-from legendmeta import AttrsDict
+from legendmeta.jsondb import AttrsDict
 from pyg4ometry import geant4
 
 
@@ -69,13 +69,9 @@ def place_hpge_strings(
         hpge_string = hpge_string_config.hpge_string[hpge_string_id]
         hpge_unit_id_in_string = hpge_meta.location.position
 
-        x_pos = hpge_string.radius_in_mm * math.cos(
-            math.pi * hpge_string.angle_in_deg / 180
-        )
+        x_pos = hpge_string.radius_in_mm * math.cos(math.pi * hpge_string.angle_in_deg / 180)
 
-        y_pos = hpge_string.radius_in_mm * math.sin(
-            math.pi * hpge_string.angle_in_deg / 180
-        )
+        y_pos = hpge_string.radius_in_mm * math.sin(math.pi * hpge_string.angle_in_deg / 180)
 
         z_pos = (
             z0
