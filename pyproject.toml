@@ -68,6 +68,9 @@ test = [
     "pytest-cov",
 ]
 
+[project.scripts]
+legend-pygeom-l200 = "l200geom.cli:dump_gdml_cli"
+
 [tool.setuptools]
 include-package-data = true
 zip-safe = false
