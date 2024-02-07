@@ -25,7 +25,9 @@ def place_fiber_modules(
 
         if mod is None:
             # initialize a new module object if we don't have one yet.
-            tpb_thickness = fiber_metadata[ch.location.fiber].geometry.tpb.thickness_in_nm
+            tpb_thickness = fiber_metadata[
+                ch.location.fiber
+            ].geometry.tpb.thickness_in_nm
             module_type = fiber_metadata[ch.location.fiber].type
             mod = {
                 "type": module_type,
@@ -38,7 +40,9 @@ def place_fiber_modules(
         assert mod[ch.location.position] is None
         mod[ch.location.position] = ch.name
 
-    factory = ModuleFactorySingleFibers if use_detailed_fiber_model else ModuleFactorySegment
+    factory = (
+        ModuleFactorySingleFibers if use_detailed_fiber_model else ModuleFactorySegment
+    )
 
     ob_factory = factory(
         radius_mm=590 / 2,
@@ -62,9 +66,13 @@ def place_fiber_modules(
         assert m0 == m1
         module_num = (m0 - 1) / 2
         if mod["type"] == "outer":
-            ob_factory.create_module(mod_name, mod, mother_lv, module_num, z_displacement=+1000)
+            ob_factory.create_module(
+                mod_name, mod, mother_lv, module_num, z_displacement=+1000
+            )
         if mod["type"] == "inner":
-            ib_factory.create_module(mod_name, mod, mother_lv, module_num, z_displacement=+1250)
+            ib_factory.create_module(
+                mod_name, mod, mother_lv, module_num, z_displacement=+1250
+            )
 
 
 class ModuleFactoryBase:
@@ -110,7 +118,9 @@ class ModuleFactoryBase:
             self.registry,
             "mm",
         )
-        self.sipm_lv = g4.LogicalVolume(sipm, self.materials.metal_silicon, v_name, self.registry)
+        self.sipm_lv = g4.LogicalVolume(
+            sipm, self.materials.metal_silicon, v_name, self.registry
+        )
 
         sipm_outer1 = g4.solid.Tubs(
             f"sipm_outer1{v_suffix}",
@@ -182,7 +192,9 @@ class ModuleFactoryBase:
         sipm_name: str,
         z_displacement: float,
     ) -> None:
-        z = +self.fiber_length / 2 + self.SIPM_HEIGHT / 2 + self.SIPM_GAP  # add small gap
+        z = (
+            +self.fiber_length / 2 + self.SIPM_HEIGHT / 2 + self.SIPM_GAP
+        )  # add small gap
         z_outer = (
             z + self.SIPM_OUTER_EXTRA / 2 - self.SIPM_OVERLAP / 2 - self.SIPM_GAP
             if is_top
@@ -296,10 +308,19 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
             return self.registry.logicalVolumeDict[v_name]
 
         coating_dim = self.FIBER_DIM + tpb_thickness_nm / 1e6
-        coating = g4.solid.Box(v_name, coating_dim, coating_dim, self.fiber_length, self.registry, "mm")
-        coating_lv = g4.LogicalVolume(coating, self.materials.tpb_on_fibers, v_name, self.registry)
+        coating = g4.solid.Box(
+            v_name, coating_dim, coating_dim, self.fiber_length, self.registry, "mm"
+        )
+        coating_lv = g4.LogicalVolume(
+            coating, self.materials.tpb_on_fibers, v_name, self.registry
+        )
         g4.PhysicalVolume(
-            [0, 0, 0], [0, 0, 0], self.fiber_cl2_lv, f"fiber_cl2{v_suffix}", coating_lv, self.registry
+            [0, 0, 0],
+            [0, 0, 0],
+            self.fiber_cl2_lv,
+            f"fiber_cl2{v_suffix}",
+            coating_lv,
+            self.registry,
         )
 
         coating_lv.pygeom_color_rgba = [0, 1, 0, 1]
@@ -307,7 +328,12 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
         return coating_lv
 
     def create_module(
-        self, mod_name: str, mod, mother_lv: g4.LogicalVolume, module_num, z_displacement: float
+        self,
+        mod_name: str,
+        mod,
+        mother_lv: g4.LogicalVolume,
+        module_num,
+        z_displacement: float,
     ) -> None:
         self._cached_fiber_volumes()
         self._cached_sipm_volumes()
@@ -315,8 +341,15 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
 
         start_angle = 2 * math.pi / self.number_of_modules * module_num
         fibers = []
-        for n in range(0, self.fiber_count_per_module):
-            th = start_angle + 2 * math.pi / self.number_of_modules / self.fiber_count_per_module * (n + 0.5)
+        for n in range(self.fiber_count_per_module):
+            th = (
+                start_angle
+                + 2
+                * math.pi
+                / self.number_of_modules
+                / self.fiber_count_per_module
+                * (n + 0.5)
+            )
             x = self.radius * math.cos(th)
             y = self.radius * math.sin(th)
             fibers.append(
@@ -331,8 +364,12 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
             )
 
         # create SiPMs and attach to fibers
-        self._create_sipm(module_num, fibers, True, mother_lv, mod["top"], z_displacement)
-        self._create_sipm(module_num, fibers, False, mother_lv, mod["bottom"], z_displacement)
+        self._create_sipm(
+            module_num, fibers, True, mother_lv, mod["top"], z_displacement
+        )
+        self._create_sipm(
+            module_num, fibers, False, mother_lv, mod["bottom"], z_displacement
+        )
 
 
 class ModuleFactorySegment(ModuleFactoryBase):
@@ -434,7 +471,9 @@ class ModuleFactorySegment(ModuleFactoryBase):
             self.registry,
             "mm",
         )
-        coating_lv = g4.LogicalVolume(coating, self.materials.tpb_on_fibers, v_name, self.registry)
+        coating_lv = g4.LogicalVolume(
+            coating, self.materials.tpb_on_fibers, v_name, self.registry
+        )
         g4.PhysicalVolume(
             [0, 0, 0],
             [0, 0, 0],
@@ -476,5 +515,9 @@ class ModuleFactorySegment(ModuleFactoryBase):
         )
 
         # create SiPMs and attach to fibers
-        self._create_sipm(module_num, fibers, True, mother_lv, mod["top"], z_displacement)
-        self._create_sipm(module_num, fibers, False, mother_lv, mod["bottom"], z_displacement)
+        self._create_sipm(
+            module_num, fibers, True, mother_lv, mod["top"], z_displacement
+        )
+        self._create_sipm(
+            module_num, fibers, False, mother_lv, mod["bottom"], z_displacement
+        )

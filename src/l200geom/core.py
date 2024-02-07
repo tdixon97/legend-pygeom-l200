@@ -51,6 +51,8 @@ def construct(use_detailed_fiber_model: bool = False) -> geant4.Registry:
 
     # build fiber modules
     fiber_modules = lmeta.hardware.detectors.lar.fibers
-    fibers.place_fiber_modules(fiber_modules, channelmap, lar_lv, mats, reg, use_detailed_fiber_model)
+    fibers.place_fiber_modules(
+        fiber_modules, channelmap, lar_lv, mats, reg, use_detailed_fiber_model
+    )
 
     return reg
