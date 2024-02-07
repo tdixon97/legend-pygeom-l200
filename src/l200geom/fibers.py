@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import math
 
-from legendmeta.jsondb import AttrsDict, JsonDB
+from legendmeta import AttrsDict, TextDB
 from pyg4ometry import geant4 as g4
 
 from . import materials
 
 
 def place_fiber_modules(
-    fiber_metadata: JsonDB,
+    fiber_metadata: TextDB,
     ch_map: AttrsDict,
     mother_lv: g4.LogicalVolume,
     materials: materials.OpticalMaterialRegistry,

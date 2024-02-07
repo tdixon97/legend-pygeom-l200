@@ -5,7 +5,7 @@ import math
 from pathlib import Path
 
 from legendhpges import make_hpge
-from legendmeta.jsondb import AttrsDict
+from legendmeta import AttrsDict
 from pyg4ometry import geant4
 
 
