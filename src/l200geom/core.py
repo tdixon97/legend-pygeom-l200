@@ -58,7 +58,7 @@ def construct(
     hpge_string_config = configs.on("20230311T235840Z")
 
     if "strings" in assemblies:
-        hpge_strings.place_hpge_strings(channelmap, hpge_string_config, 1950, lar_lv, reg)
+        hpge_strings.place_hpge_strings(channelmap, hpge_string_config, 1950, lar_lv, mats, reg)
 
     # build fiber modules
     if "fibers" in assemblies:

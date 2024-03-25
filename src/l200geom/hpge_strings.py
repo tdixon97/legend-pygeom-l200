@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import json
 import math
+from importlib import resources
 from pathlib import Path
 
+import pyg4ometry
 from legendhpges import make_hpge
 from legendmeta import AttrsDict
 from pyg4ometry import geant4
+
+from . import materials
 
 
 def place_hpge_strings(
@@ -14,6 +18,7 @@ def place_hpge_strings(
     string_config: str | dict | AttrsDict,
     z0: float,
     mothervolume: geant4.LogicalVolume,
+    materials: materials.OpticalMaterialRegistry,
     registry: geant4.Registry,
 ) -> None:
     """Construct LEGEND-200 HPGe strings.
@@ -93,3 +98,62 @@ def place_hpge_strings(
             mothervolume,
             registry,
         )
+
+
+_pen_plate_cache = {}
+_minishroud_cache = {}
+
+
+def _get_pen_plate(
+    size: str,
+    materials: materials.OpticalMaterialRegistry,
+    registry: geant4.Registry,
+) -> geant4.LogicalVolume:
+    if size not in ["small", "medium", "large", "xlarge"]:
+        msg = f"Invalid PEN-plate size {size}"
+        raise ValueError(msg)
+
+    if size not in _pen_plate_cache:
+        pen_file = resources.files("l200geom") / "models" / f"BasePlate_{size}.stl"
+        pen_solid = pyg4ometry.stl.Reader(
+            pen_file, solidname=f"pen_{size}", centre=False, registry=registry
+        ).getSolid()
+        _pen_plate_cache[size] = geant4.LogicalVolume(pen_solid, materials.pen, f"pen_{size}", registry)
+
+    return _pen_plate_cache[size]
+
+
+def _get_nylon_mini_shroud(
+    radius: int,
+    length: int,
+    materials: materials.OpticalMaterialRegistry,
+    registry: geant4.Registry,
+) -> geant4.LogicalVolume:
+    """Create a nylon/TPB funnel of the given outer dimensions, which will be closed at the top/bottom.
+
+    .. note:: this can also be used for calibration tubes.
+    """
+    shroud_name = f"minishroud_{radius}x{length}"
+    if shroud_name not in _minishroud_cache:
+        shroudThickness = 0.1  # mm
+        outer = geant4.solid.Tubs(f"{shroud_name}_outer", 0, radius, length, 0, 2 * math.pi, registry)
+        inner = geant4.solid.Tubs(
+            f"{shroud_name}_inner",
+            0,
+            radius - shroudThickness,
+            length - 2 * shroudThickness,
+            0,
+            2 * math.pi,
+            registry,
+        )
+        # subtract the slightly smaller solid from the larger one, to get a hollow and closed volume.
+        shroud = geant4.solid.Subtraction("minishroud", outer, inner, [[0, 0, 0], [0, 0, 0]], registry)
+        _minishroud_cache[shroud_name] = geant4.LogicalVolume(
+            shroud,
+            materials.tpb_on_nylon,
+            shroud_name,
+            registry,
+        )
+
+    # TODO: implement optical surfaces
+    return _minishroud_cache[shroud_name]
