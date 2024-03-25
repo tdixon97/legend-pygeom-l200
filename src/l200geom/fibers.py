@@ -444,14 +444,75 @@ class ModuleFactorySegment(ModuleFactoryBase):
         delta_r_mm = (outer_r - inner_r) / 2
         bend_r_outer = self.bend_radius_mm + delta_r_mm
         bend_r_inner = self.bend_radius_mm - delta_r_mm
+
         angles = np.linspace(0, np.pi / 2, 100)
-        z1 = bend_r_outer * (1 - np.sin(angles))
-        r1 = bend_r_outer * (1 - 1 + np.cos(angles))
-        z2 = bend_r_inner * (1 - np.sin(angles))
-        r2 = bend_r_inner * (1 - 1 + np.cos(angles))
-        z = np.concatenate((z1, np.flip(z2)))
+        z1 = bend_r_outer * np.sin(angles)
+        r1 = bend_r_outer * np.cos(angles)
+        z2 = bend_r_inner * np.sin(angles)
+        r2 = bend_r_inner * np.cos(angles)
+
+        z = self.bend_radius_mm - np.concatenate((z1, np.flip(z2)))
+        # offset by the radius at the inner end of the bend.
         r = (outer_r - bend_r_outer) + np.concatenate((r1, np.flip(r2)))
+
         return z, r
+
+    def _cached_sipm_volumes_bend(self) -> None:
+        v_suffix = f"_bend{self.bend_radius_mm}_r{self.radius}_nmod{self.number_of_modules}"
+        v_name = f"sipm{v_suffix}"
+        if v_name in self.registry.solidDict:
+            return
+
+        sipm_dim = self.FIBER_DIM + 0.01  # +0.01 to fit round->square
+        fiber_segment = 2 * math.pi / self.number_of_modules
+        # radius of the inner circle at the bottom, already including the small gap between fibers and SiPM.
+        inner_radius = self.radius - self.bend_radius_mm - self.SIPM_GAP
+
+        sipm = g4.solid.Tubs(
+            v_name,
+            inner_radius - self.SIPM_HEIGHT,
+            inner_radius,
+            sipm_dim,
+            0,
+            fiber_segment,
+            self.registry,
+            "mm",
+        )
+        self.sipm_lv_bend = g4.LogicalVolume(sipm, self.materials.metal_silicon, v_name, self.registry)
+
+        sipm_outer1 = g4.solid.Tubs(
+            f"sipm_outer1{v_suffix}",
+            inner_radius - self.SIPM_HEIGHT - self.SIPM_OUTER_EXTRA,
+            inner_radius + self.SIPM_OVERLAP,
+            sipm_dim + 2 * self.SIPM_OUTER_EXTRA,
+            0,
+            fiber_segment,
+            self.registry,
+            "mm",
+        )
+        sipm_outer2 = g4.solid.Tubs(
+            f"sipm_outer2{v_suffix}",
+            inner_radius - self.SIPM_HEIGHT,
+            inner_radius + 2 * self.SIPM_GAP + self.SIPM_OVERLAP,
+            sipm_dim,
+            0,
+            fiber_segment,
+            self.registry,
+            "mm",
+        )
+        sipm_outer_bottom = g4.solid.Subtraction(
+            f"sipm_outer_bottom{v_suffix}",
+            sipm_outer1,
+            sipm_outer2,
+            [[0, 0, 0], [0, 0, 0]],
+            self.registry,
+        )
+        self.sipm_outer_bottom_lv_bend = g4.LogicalVolume(
+            sipm_outer_bottom,
+            self.materials.metal_copper,
+            f"sipm_outer_bottom{v_suffix}",
+            self.registry,
+        )
 
     def _cached_fiber_volumes(self) -> None:
         """Create solids, logical and physical volumes for the fibers, as specified by the parameters of this instance."""
@@ -606,7 +667,7 @@ class ModuleFactorySegment(ModuleFactoryBase):
             z, r = self._get_bend_polycone(self.radius - coating_dim / 2, self.radius + coating_dim / 2)
             coating = g4.solid.GenericPolycone(v_name, 0, angle, r, z, self.registry, "mm")
             inner_lv = self.fiber_cl2_bend_lv
-            z_displacement = -(self.FIBER_DIM - coating_dim)
+            z_displacement = self.FIBER_DIM - coating_dim
         coating_lv = g4.LogicalVolume(coating, self.materials.tpb_on_fibers, v_name, self.registry)
         g4.PhysicalVolume(
             [0, 0, 0],
@@ -633,6 +694,7 @@ class ModuleFactorySegment(ModuleFactoryBase):
         self._cached_sipm_volumes()
         coating_lv = self._cached_tpb_coating_volume(mod["tpb_thickness"], bend=False)
         if self.bend_radius_mm is not None:
+            self._cached_sipm_volumes_bend()
             coating_lv_bend = self._cached_tpb_coating_volume(mod["tpb_thickness"], bend=True)
 
         start_angle = 2 * math.pi / self.number_of_modules * (module_num)
@@ -665,3 +727,22 @@ class ModuleFactorySegment(ModuleFactoryBase):
         self._create_sipm(module_num, fibers, True, mother_lv, mod["top"], z_displacement)
         if self.bend_radius_mm is None:
             self._create_sipm(module_num, fibers, False, mother_lv, mod["bottom"], z_displacement)
+        else:
+            start_angle = 2 * math.pi / self.number_of_modules * module_num
+            z = z_displacement - self.fiber_length / 2 - self.bend_radius_mm
+            g4.PhysicalVolume(
+                [0, 0, -start_angle],
+                [0, 0, z],
+                self.sipm_lv_bend,
+                mod["bottom"],
+                mother_lv,
+                self.registry,
+            )
+            g4.PhysicalVolume(
+                [0, 0, -start_angle],
+                [0, 0, z],
+                self.sipm_outer_bottom_lv_bend,
+                f"{mod['bottom']}_wrap",
+                mother_lv,
+                self.registry,
+            )
