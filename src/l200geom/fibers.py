@@ -462,51 +462,52 @@ class ModuleFactorySegment(ModuleFactoryBase):
         fiber_thickness_cl1 = 0.04 * self.FIBER_DIM  # (BCF-91A document)
         fiber_thickness_cl2 = 0.02 * self.FIBER_DIM  # (BCF-91A document)
         # create solids
-        self.angle = 2 * math.pi / self.number_of_modules
+        angle = 2 * np.pi / self.number_of_modules
+        dim_cl2 = self.FIBER_DIM
         self.fiber_cl2 = g4.solid.Tubs(
             f"fiber_cl2{v_suffix}",
-            self.radius - self.FIBER_DIM,
-            self.radius,
+            self.radius - dim_cl2 / 2,
+            self.radius + dim_cl2 / 2,
             self.fiber_length,
             0,
-            self.angle,
+            angle,
             self.registry,
             "mm",
         )
         dim_cl1 = self.FIBER_DIM - fiber_thickness_cl1
         self.fiber_cl1 = g4.solid.Tubs(
             f"fiber_cl1{v_suffix}",
-            self.radius - dim_cl1,
-            self.radius + dim_cl1 - self.FIBER_DIM,
+            self.radius - dim_cl1 / 2,
+            self.radius + dim_cl1 / 2,
             self.fiber_length,
             0,
-            self.angle,
+            angle,
             self.registry,
             "mm",
         )
         dim_core = self.FIBER_DIM - fiber_thickness_cl1 - fiber_thickness_cl2
         self.fiber_core = g4.solid.Tubs(
             f"fiber_core{v_suffix}",
-            self.radius - dim_core,
-            self.radius + dim_core - self.FIBER_DIM,
+            self.radius - dim_core / 2,
+            self.radius + dim_core / 2,
             self.fiber_length,
             0,
-            self.angle,
+            angle,
             self.registry,
             "mm",
         )
         if self.bend_radius_mm is not None:
-            z, r = self._get_bend_polycone(self.radius - self.FIBER_DIM, self.radius)
+            z, r = self._get_bend_polycone(self.radius - dim_cl2 / 2, self.radius + dim_cl2 / 2)
             self.fiber_cl2_bend = g4.solid.GenericPolycone(
-                f"fiber_cl2_bend{v_suffix}", 0, self.angle, r, z, self.registry, "mm"
+                f"fiber_cl2_bend{v_suffix}", 0, angle, r, z, self.registry, "mm"
             )
-            z, r = self._get_bend_polycone(self.radius - dim_cl1, self.radius + dim_cl1 - self.FIBER_DIM)
+            z, r = self._get_bend_polycone(self.radius - dim_cl1 / 2, self.radius + dim_cl1 / 2)
             self.fiber_cl1_bend = g4.solid.GenericPolycone(
-                f"fiber_cl1_bend{v_suffix}", 0, self.angle, r, z, self.registry, "mm"
+                f"fiber_cl1_bend{v_suffix}", 0, angle, r, z, self.registry, "mm"
             )
-            z, r = self._get_bend_polycone(self.radius - dim_core, self.radius + dim_core - self.FIBER_DIM)
+            z, r = self._get_bend_polycone(self.radius - dim_core / 2, self.radius + dim_core / 2)
             self.fiber_core_bend = g4.solid.GenericPolycone(
-                f"fiber_core_bend{v_suffix}", 0, self.angle, r, z, self.registry, "mm"
+                f"fiber_core_bend{v_suffix}", 0, angle, r, z, self.registry, "mm"
             )
 
         self.fiber_cl2_lv = g4.LogicalVolume(
@@ -590,8 +591,8 @@ class ModuleFactorySegment(ModuleFactoryBase):
         if not bend:
             coating = g4.solid.Tubs(
                 v_name,
-                self.radius - coating_dim,
-                self.radius + coating_dim - self.FIBER_DIM,
+                self.radius - coating_dim / 2,
+                self.radius + coating_dim / 2,
                 self.fiber_length,
                 0,
                 2 * math.pi / self.number_of_modules,
@@ -601,16 +602,15 @@ class ModuleFactorySegment(ModuleFactoryBase):
             inner_lv = self.fiber_cl2_lv
             z_displacement = 0
         else:
-            z, r = self._get_bend_polycone(
-                self.radius - coating_dim, self.radius + coating_dim - self.FIBER_DIM
-            )
-            coating = g4.solid.GenericPolycone(v_name, 0, self.angle, r, z, self.registry, "mm")
+            angle = 2 * np.pi / self.number_of_modules
+            z, r = self._get_bend_polycone(self.radius - coating_dim / 2, self.radius + coating_dim / 2)
+            coating = g4.solid.GenericPolycone(v_name, 0, angle, r, z, self.registry, "mm")
             inner_lv = self.fiber_cl2_bend_lv
             z_displacement = -(self.FIBER_DIM - coating_dim)
         coating_lv = g4.LogicalVolume(coating, self.materials.tpb_on_fibers, v_name, self.registry)
         g4.PhysicalVolume(
             [0, 0, 0],
-            [0, 0, z_displacement], # TODO
+            [0, 0, z_displacement],
             inner_lv,
             f"fiber_cl2{v_suffix}",
             coating_lv,
