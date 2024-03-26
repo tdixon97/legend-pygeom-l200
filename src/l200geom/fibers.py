@@ -272,6 +272,55 @@ class ModuleFactoryBase(ABC):
 
 
 class ModuleFactorySingleFibers(ModuleFactoryBase):
+    def _cached_sipm_volumes_bend(self) -> None:
+        """Creates (dummy) SiPM volumes for use at the bottom of bent fiber sections."""
+        v_suffix = "_bend"  # this dummy SiPM is for one single fiber, so we do not need any attributes here.
+        v_name = f"sipm{v_suffix}"
+        if v_name in self.registry.solidDict:
+            return
+
+        sipm_dim = self.FIBER_DIM + self.SIPM_GAP_SIDE  # GAP_SIDE to fit round->square
+
+        sipm = g4.solid.Box(
+            v_name,
+            self.SIPM_HEIGHT,
+            sipm_dim,
+            sipm_dim,
+            self.registry,
+            "mm",
+        )
+        self.sipm_lv_bend = g4.LogicalVolume(sipm, self.materials.metal_silicon, v_name, self.registry)
+
+        sipm_outer1 = g4.solid.Box(
+            f"sipm_outer1{v_suffix}",
+            self.SIPM_HEIGHT + self.SIPM_OUTER_EXTRA + self.SIPM_OVERLAP,
+            sipm_dim + 2 * self.SIPM_OUTER_EXTRA,
+            sipm_dim + 2 * self.SIPM_OUTER_EXTRA,
+            self.registry,
+            "mm",
+        )
+        sipm_outer2 = g4.solid.Box(
+            f"sipm_outer2{v_suffix}",
+            self.SIPM_HEIGHT + 2 * self.SIPM_GAP + self.SIPM_OVERLAP,
+            sipm_dim,
+            sipm_dim,
+            self.registry,
+            "mm",
+        )
+        sipm_outer_bottom = g4.solid.Subtraction(
+            f"sipm_outer_bottom{v_suffix}",
+            sipm_outer1,
+            sipm_outer2,
+            [[0, 0, 0], [-self.SIPM_OUTER_EXTRA / 2, 0, 0]],
+            self.registry,
+        )
+        self.sipm_outer_bottom_lv_bend = g4.LogicalVolume(
+            sipm_outer_bottom,
+            self.materials.metal_copper,
+            f"sipm_outer_bottom{v_suffix}",
+            self.registry,
+        )
+
     def _cached_fiber_volumes(self) -> None:
         """Create solids, logical and physical volumes for the fibers, as specified by the parameters of this instance."""
         v_suffix = f"_l{self.fiber_length}_b{self.bend_radius_mm}"
@@ -453,6 +502,7 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
         self._cached_sipm_volumes()
         coating_lv = self._cached_tpb_coating_volume(mod.tpb_thickness, bend=False)
         if self.bend_radius_mm is not None:
+            self._cached_sipm_volumes_bend()
             coating_lv_bend = self._cached_tpb_coating_volume(mod.tpb_thickness, bend=True)
 
         start_angle = 2 * math.pi / self.number_of_modules * module_num
@@ -486,11 +536,38 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                     )
                 )
                 # TODO: for bent modules, implement something not to have overlaps
-                # TODO: and also add per-fiber SiPMs (I do not know any other way...)
+
+                # add per-fiber SiPMs (I do not know any other way...)
+                sipm_placement_r = self.radius - self.bend_radius_mm - self.SIPM_GAP - self.SIPM_HEIGHT / 2
+                x2 = sipm_placement_r * math.cos(th)
+                y2 = sipm_placement_r * math.sin(th)
+                z = z_displacement - self.fiber_length / 2 - self.bend_radius_mm
+                g4.PhysicalVolume(
+                    [0, 0, -th],
+                    [x2, y2, z],
+                    self.sipm_lv_bend,
+                    f"{mod.channel_bottom}_{n}",
+                    mother_lv,
+                    self.registry,
+                )
+
+                sipm_placement_outer_r = (
+                    sipm_placement_r + self.SIPM_OUTER_EXTRA / 2 - self.SIPM_OVERLAP / 2 - self.SIPM_GAP
+                )
+                x2 = sipm_placement_outer_r * math.cos(th)
+                y2 = sipm_placement_outer_r * math.sin(th)
+                g4.PhysicalVolume(
+                    [0, 0, -th],
+                    [x2, y2, z],
+                    self.sipm_outer_bottom_lv_bend,
+                    f"{mod.channel_bottom}_{n}_wrap",
+                    mother_lv,
+                    self.registry,
+                )
 
         # create SiPMs and attach to fibers
         self._create_sipm(module_num, fibers, True, mother_lv, mod.channel_top, z_displacement)
-        if self.bend_radius_mm is not None:
+        if self.bend_radius_mm is None:
             self._create_sipm(module_num, fibers, False, mother_lv, mod.channel_bottom, z_displacement)
 
 
