@@ -272,6 +272,10 @@ class ModuleFactoryBase(ABC):
 
 
 class ModuleFactorySingleFibers(ModuleFactoryBase):
+    # for bent detailed fibers, the fibers would overlap a lot near the bottom SiPMs. To avoid
+    # this, use a staggered design of the fibers.
+    ALLOWED_DELTA_LENGTHS = (-6.6, -4.95, -3.3, -1.65, 0, 1.65, 3.3, 4.95, 6.6)
+
     def _cached_sipm_volumes_bend(self) -> None:
         """Creates (dummy) SiPM volumes for use at the bottom of bent fiber sections."""
         v_suffix = "_bend"  # this dummy SiPM is for one single fiber, so we do not need any attributes here.
@@ -327,35 +331,51 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
         if f"fiber_cl2{v_suffix}" in self.registry.solidDict:
             return
 
-        # create solids
-        self.fiber_cl2 = g4.solid.Box(
-            f"fiber_cl2{v_suffix}",
-            self.FIBER_DIM,
-            self.FIBER_DIM,
-            self.fiber_length,
-            self.registry,
-            "mm",
-        )
-        dim_cl1 = self.FIBER_DIM - self.FIBER_THICKNESS_CL1
-        self.fiber_cl1 = g4.solid.Box(
-            f"fiber_cl1{v_suffix}",
-            dim_cl1,
-            dim_cl1,
-            self.fiber_length,
-            self.registry,
-            "mm",
-        )
-        dim_core = self.FIBER_DIM - self.FIBER_THICKNESS_CL1 - self.FIBER_THICKNESS_CL2
-        self.fiber_core = g4.solid.Box(
-            f"fiber_core{v_suffix}",
-            dim_core,
-            dim_core,
-            self.fiber_length,
-            self.registry,
-            "mm",
-        )
+        fibers_to_gen = [(v_suffix, self.fiber_length)]
         if self.bend_radius_mm is not None:
-            self.fiber_cl2_bend = g4.solid.Tubs(
+            for delta_length in self.ALLOWED_DELTA_LENGTHS:
+                if delta_length == 0:
+                    continue
+                fibers_to_gen += [
+                    (
+                        f"_l{self.fiber_length + delta_length}_b{self.bend_radius_mm}",
+                        self.fiber_length + delta_length,
+                    )
+                ]
+
+        # create solids
+        fiber_cl2 = {}
+        fiber_cl1 = {}
+        fiber_core = {}
+        dim_cl1 = self.FIBER_DIM - self.FIBER_THICKNESS_CL1
+        dim_core = self.FIBER_DIM - self.FIBER_THICKNESS_CL1 - self.FIBER_THICKNESS_CL2
+        for [fiber_name, fiber_length] in fibers_to_gen:
+            fiber_cl2[fiber_length] = g4.solid.Box(
+                f"fiber_cl2{fiber_name}",
+                self.FIBER_DIM,
+                self.FIBER_DIM,
+                fiber_length,
+                self.registry,
+                "mm",
+            )
+            fiber_cl1[fiber_length] = g4.solid.Box(
+                f"fiber_cl1{fiber_name}",
+                dim_cl1,
+                dim_cl1,
+                fiber_length,
+                self.registry,
+                "mm",
+            )
+            fiber_core[fiber_length] = g4.solid.Box(
+                f"fiber_core{fiber_name}",
+                dim_core,
+                dim_core,
+                fiber_length,
+                self.registry,
+                "mm",
+            )
+        if self.bend_radius_mm is not None:
+            fiber_cl2_bend = g4.solid.Tubs(
                 f"fiber_cl2_bend{v_suffix}",
                 self.bend_radius_mm - self.FIBER_DIM / 2,
                 self.bend_radius_mm + self.FIBER_DIM / 2,
@@ -365,7 +385,7 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                 self.registry,
                 "mm",
             )
-            self.fiber_cl1_bend = g4.solid.Tubs(
+            fiber_cl1_bend = g4.solid.Tubs(
                 f"fiber_cl1_bend{v_suffix}",
                 self.bend_radius_mm - dim_cl1 / 2,
                 self.bend_radius_mm + dim_cl1 / 2,
@@ -375,7 +395,7 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                 self.registry,
                 "mm",
             )
-            self.fiber_core_bend = g4.solid.Tubs(
+            fiber_core_bend = g4.solid.Tubs(
                 f"fiber_core_bend{v_suffix}",
                 self.bend_radius_mm - dim_core / 2,
                 self.bend_radius_mm + dim_core / 2,
@@ -386,87 +406,90 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                 "mm",
             )
 
-        self.fiber_cl2_lv = g4.LogicalVolume(
-            self.fiber_cl2,
-            self.materials.pmma_out,
-            f"fiber_cl2{v_suffix}",
-            self.registry,
-        )
-        self.fiber_cl1_lv = g4.LogicalVolume(
-            self.fiber_cl1, self.materials.pmma, f"fiber_cl1{v_suffix}", self.registry
-        )
-        self.fiber_core_lv = g4.LogicalVolume(
-            self.fiber_core,
-            self.materials.ps_fibers,
-            f"fiber_core{v_suffix}",
-            self.registry,
-        )
+        self.fiber_cl2_lv = {}
+        fiber_cl1_lv = {}
+        fiber_core_lv = {}
+        for [fiber_name, fiber_length] in fibers_to_gen:
+            self.fiber_cl2_lv[fiber_length] = g4.LogicalVolume(
+                fiber_cl2[fiber_length], self.materials.pmma_out, f"fiber_cl2{fiber_name}", self.registry
+            )
+            fiber_cl1_lv[fiber_length] = g4.LogicalVolume(
+                fiber_cl1[fiber_length], self.materials.pmma, f"fiber_cl1{fiber_name}", self.registry
+            )
+            fiber_core_lv[fiber_length] = g4.LogicalVolume(
+                fiber_core[fiber_length], self.materials.ps_fibers, f"fiber_core{fiber_name}", self.registry
+            )
         if self.bend_radius_mm is not None:
             self.fiber_cl2_bend_lv = g4.LogicalVolume(
-                self.fiber_cl2_bend,
-                self.materials.pmma_out,
-                f"fiber_cl2_bend{v_suffix}",
-                self.registry,
+                fiber_cl2_bend, self.materials.pmma_out, f"fiber_cl2_bend{v_suffix}", self.registry
             )
-            self.fiber_cl1_bend_lv = g4.LogicalVolume(
-                self.fiber_cl1_bend, self.materials.pmma, f"fiber_cl1_bend{v_suffix}", self.registry
+            fiber_cl1_bend_lv = g4.LogicalVolume(
+                fiber_cl1_bend, self.materials.pmma, f"fiber_cl1_bend{v_suffix}", self.registry
             )
-            self.fiber_core_bend_lv = g4.LogicalVolume(
-                self.fiber_core_bend,
-                self.materials.ps_fibers,
-                f"fiber_core_bend{v_suffix}",
-                self.registry,
+            fiber_core_bend_lv = g4.LogicalVolume(
+                fiber_core_bend, self.materials.ps_fibers, f"fiber_core_bend{v_suffix}", self.registry
             )
 
-        self.fiber_cl1_pv = g4.PhysicalVolume(
-            [0, 0, 0],
-            [0, 0, 0],
-            self.fiber_cl1_lv,
-            f"fiber_cl1{v_suffix}",
-            self.fiber_cl2_lv,
-            self.registry,
-        )
-        self.fiber_core_pv = g4.PhysicalVolume(
-            [0, 0, 0],
-            [0, 0, 0],
-            self.fiber_core_lv,
-            f"fiber_core{v_suffix}",
-            self.fiber_cl1_lv,
-            self.registry,
-        )
+        for [fiber_name, fiber_length] in fibers_to_gen:
+            g4.PhysicalVolume(
+                [0, 0, 0],
+                [0, 0, 0],
+                fiber_cl1_lv[fiber_length],
+                f"fiber_cl1{fiber_name}",
+                self.fiber_cl2_lv[fiber_length],
+                self.registry,
+            )
+            g4.PhysicalVolume(
+                [0, 0, 0],
+                [0, 0, 0],
+                fiber_core_lv[fiber_length],
+                f"fiber_core{fiber_name}",
+                fiber_cl1_lv[fiber_length],
+                self.registry,
+            )
         if self.bend_radius_mm is not None:
-            self.fiber_cl1_bend_pv = g4.PhysicalVolume(
+            g4.PhysicalVolume(
                 [0, 0, 0],
                 [0, 0, 0],
-                self.fiber_cl1_bend_lv,
+                fiber_cl1_bend_lv,
                 f"fiber_cl1_bend{v_suffix}",
                 self.fiber_cl2_bend_lv,
                 self.registry,
             )
-            self.fiber_core_bend_pv = g4.PhysicalVolume(
+            g4.PhysicalVolume(
                 [0, 0, 0],
                 [0, 0, 0],
-                self.fiber_core_bend_lv,
+                fiber_core_bend_lv,
                 f"fiber_core_bend{v_suffix}",
-                self.fiber_cl1_bend_lv,
+                fiber_cl1_bend_lv,
                 self.registry,
             )
 
-    def _cached_tpb_coating_volume(self, tpb_thickness_nm: float, bend: bool = False) -> g4.LogicalVolume:
+    def _cached_tpb_coating_volume(
+        self, tpb_thickness_nm: float, bend: bool = False, delta_length: int = 0
+    ) -> g4.LogicalVolume:
         """Create and cache a TPB coating layer of the specified thickness.
 
         The TPB-Layer is dependent on the module (i.e. the applied thickness varies slightly),
         so we cannot cache it globally on this instance.
         """
-        v_suffix = f"{'_bend' if bend else ''}_l{self.fiber_length}_tpb{tpb_thickness_nm}"
+        if delta_length != 0 and bend:
+            msg = "creating a bent volume with delta_length!=0 is not possible"
+            raise ValueError(msg)
+        if delta_length not in self.ALLOWED_DELTA_LENGTHS:
+            msg = f"invalid delta length {delta_length}"
+            raise ValueError(msg)
+        fiber_length = self.fiber_length + delta_length
+
+        v_suffix = f"{'_bend' if bend else ''}_l{fiber_length}_tpb{tpb_thickness_nm}"
         v_name = f"fiber_coating{v_suffix}"
         if v_name in self.registry.solidDict:
             return self.registry.logicalVolumeDict[v_name]
 
         coating_dim = self.FIBER_DIM + tpb_thickness_nm / 1e6
         if not bend:
-            coating = g4.solid.Box(v_name, coating_dim, coating_dim, self.fiber_length, self.registry, "mm")
-            inner_lv = self.fiber_cl2_lv
+            coating = g4.solid.Box(v_name, coating_dim, coating_dim, fiber_length, self.registry, "mm")
+            inner_lv = self.fiber_cl2_lv[fiber_length]
         else:
             coating = g4.solid.Tubs(
                 v_name,
@@ -500,21 +523,34 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
 
         self._cached_fiber_volumes()
         self._cached_sipm_volumes()
-        coating_lv = self._cached_tpb_coating_volume(mod.tpb_thickness, bend=False)
         if self.bend_radius_mm is not None:
             self._cached_sipm_volumes_bend()
             coating_lv_bend = self._cached_tpb_coating_volume(mod.tpb_thickness, bend=True)
 
         start_angle = 2 * math.pi / self.number_of_modules * module_num
+
         fibers = []
         for n in range(self.fiber_count_per_module):
+            delta_length = 0
+            if self.bend_radius_mm is not None:
+                # for bent detailed fibers, the fibers would overlap a lot near the bottom SiPMs. To avoid
+                # this, use a staggered design of the fibers. This is certainly not the best/most
+                # space-efficient packing for squares, but it is simple to implement. From above the solid
+                # angle coverage is the same, but there are some holes between the fibers in the lower parts
+                # if a photon arrives from the 'right' direction...
+                delta_length = self.ALLOWED_DELTA_LENGTHS[n % len(self.ALLOWED_DELTA_LENGTHS)]
+
+            coating_lv = self._cached_tpb_coating_volume(
+                mod.tpb_thickness, bend=False, delta_length=delta_length
+            )
+
             th = start_angle + 2 * math.pi / self.number_of_modules / self.fiber_count_per_module * (n + 0.5)
             x = self.radius * math.cos(th)
             y = self.radius * math.sin(th)
             fibers.append(
                 g4.PhysicalVolume(
                     [0, 0, -th],
-                    [x, y, z_displacement],
+                    [x, y, z_displacement - delta_length / 2],
                     coating_lv,
                     f"fiber_{mod_name}_{n}",
                     mother_lv,
@@ -528,20 +564,19 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                 fibers.append(
                     g4.PhysicalVolume(
                         list(rotvec),
-                        [x2, y2, z_displacement - self.fiber_length / 2],
+                        [x2, y2, z_displacement - self.fiber_length / 2 - delta_length],
                         coating_lv_bend,
                         f"fiber_bend_{mod_name}_{n}",
                         mother_lv,
                         self.registry,
                     )
                 )
-                # TODO: for bent modules, implement something not to have overlaps
 
                 # add per-fiber SiPMs (I do not know any other way...)
                 sipm_placement_r = self.radius - self.bend_radius_mm - self.SIPM_GAP - self.SIPM_HEIGHT / 2
                 x2 = sipm_placement_r * math.cos(th)
                 y2 = sipm_placement_r * math.sin(th)
-                z = z_displacement - self.fiber_length / 2 - self.bend_radius_mm
+                z = z_displacement - self.fiber_length / 2 - delta_length - self.bend_radius_mm
                 g4.PhysicalVolume(
                     [0, 0, -th],
                     [x2, y2, z],
@@ -660,7 +695,7 @@ class ModuleFactorySegment(ModuleFactoryBase):
         # create solids
         angle = 2 * np.pi / self.number_of_modules
         dim_cl2 = self.FIBER_DIM
-        self.fiber_cl2 = g4.solid.Tubs(
+        fiber_cl2 = g4.solid.Tubs(
             f"fiber_cl2{v_suffix}",
             self.radius - dim_cl2 / 2,
             self.radius + dim_cl2 / 2,
@@ -671,7 +706,7 @@ class ModuleFactorySegment(ModuleFactoryBase):
             "mm",
         )
         dim_cl1 = self.FIBER_DIM - self.FIBER_THICKNESS_CL1
-        self.fiber_cl1 = g4.solid.Tubs(
+        fiber_cl1 = g4.solid.Tubs(
             f"fiber_cl1{v_suffix}",
             self.radius - dim_cl1 / 2,
             self.radius + dim_cl1 / 2,
@@ -682,7 +717,7 @@ class ModuleFactorySegment(ModuleFactoryBase):
             "mm",
         )
         dim_core = self.FIBER_DIM - self.FIBER_THICKNESS_CL1 - self.FIBER_THICKNESS_CL2
-        self.fiber_core = g4.solid.Tubs(
+        fiber_core = g4.solid.Tubs(
             f"fiber_core{v_suffix}",
             self.radius - dim_core / 2,
             self.radius + dim_core / 2,
@@ -694,81 +729,67 @@ class ModuleFactorySegment(ModuleFactoryBase):
         )
         if self.bend_radius_mm is not None:
             z, r = self._get_bend_polycone(self.radius - dim_cl2 / 2, self.radius + dim_cl2 / 2)
-            self.fiber_cl2_bend = g4.solid.GenericPolycone(
+            fiber_cl2_bend = g4.solid.GenericPolycone(
                 f"fiber_cl2_bend{v_suffix}", 0, angle, r, z, self.registry, "mm"
             )
             z, r = self._get_bend_polycone(self.radius - dim_cl1 / 2, self.radius + dim_cl1 / 2)
-            self.fiber_cl1_bend = g4.solid.GenericPolycone(
+            fiber_cl1_bend = g4.solid.GenericPolycone(
                 f"fiber_cl1_bend{v_suffix}", 0, angle, r, z, self.registry, "mm"
             )
             z, r = self._get_bend_polycone(self.radius - dim_core / 2, self.radius + dim_core / 2)
-            self.fiber_core_bend = g4.solid.GenericPolycone(
+            fiber_core_bend = g4.solid.GenericPolycone(
                 f"fiber_core_bend{v_suffix}", 0, angle, r, z, self.registry, "mm"
             )
 
         self.fiber_cl2_lv = g4.LogicalVolume(
-            self.fiber_cl2,
-            self.materials.pmma_out,
-            f"fiber_cl2{v_suffix}",
-            self.registry,
+            fiber_cl2, self.materials.pmma_out, f"fiber_cl2{v_suffix}", self.registry
         )
-        self.fiber_cl1_lv = g4.LogicalVolume(
-            self.fiber_cl1, self.materials.pmma, f"fiber_cl1{v_suffix}", self.registry
-        )
-        self.fiber_core_lv = g4.LogicalVolume(
-            self.fiber_core,
-            self.materials.ps_fibers,
-            f"fiber_core{v_suffix}",
-            self.registry,
+        fiber_cl1_lv = g4.LogicalVolume(fiber_cl1, self.materials.pmma, f"fiber_cl1{v_suffix}", self.registry)
+        fiber_core_lv = g4.LogicalVolume(
+            fiber_core, self.materials.ps_fibers, f"fiber_core{v_suffix}", self.registry
         )
         if self.bend_radius_mm is not None:
             self.fiber_cl2_bend_lv = g4.LogicalVolume(
-                self.fiber_cl2_bend,
-                self.materials.pmma_out,
-                f"fiber_cl2_bend{v_suffix}",
-                self.registry,
+                fiber_cl2_bend, self.materials.pmma_out, f"fiber_cl2_bend{v_suffix}", self.registry
             )
-            self.fiber_cl1_bend_lv = g4.LogicalVolume(
-                self.fiber_cl1_bend, self.materials.pmma, f"fiber_cl1_bend{v_suffix}", self.registry
+            fiber_cl1_bend_lv = g4.LogicalVolume(
+                fiber_cl1_bend, self.materials.pmma, f"fiber_cl1_bend{v_suffix}", self.registry
             )
-            self.fiber_core_bend_lv = g4.LogicalVolume(
-                self.fiber_core_bend,
-                self.materials.ps_fibers,
-                f"fiber_core_bend{v_suffix}",
-                self.registry,
+            fiber_core_bend_lv = g4.LogicalVolume(
+                fiber_core_bend, self.materials.ps_fibers, f"fiber_core_bend{v_suffix}", self.registry
             )
 
-        self.fiber_cl1_pv = g4.PhysicalVolume(
+        g4.PhysicalVolume(
             [0, 0, 0],
             [0, 0, 0],
-            self.fiber_cl1_lv,
+            fiber_cl1_lv,
             f"fiber_cl1{v_suffix}",
             self.fiber_cl2_lv,
             self.registry,
         )
-        self.fiber_core_pv = g4.PhysicalVolume(
+        g4.PhysicalVolume(
             [0, 0, 0],
             [0, 0, 0],
-            self.fiber_core_lv,
+            fiber_core_lv,
             f"fiber_core{v_suffix}",
-            self.fiber_cl1_lv,
+            fiber_cl1_lv,
             self.registry,
         )
         if self.bend_radius_mm is not None:
-            self.fiber_cl1_bend_pv = g4.PhysicalVolume(
+            g4.PhysicalVolume(
                 [0, 0, 0],
                 [0, 0, self.FIBER_DIM - dim_cl1],
-                self.fiber_cl1_bend_lv,
+                fiber_cl1_bend_lv,
                 f"fiber_cl1_bend{v_suffix}",
                 self.fiber_cl2_bend_lv,
                 self.registry,
             )
-            self.fiber_core_bend_pv = g4.PhysicalVolume(
+            g4.PhysicalVolume(
                 [0, 0, 0],
                 [0, 0, self.FIBER_DIM - dim_core],
-                self.fiber_core_bend_lv,
+                fiber_core_bend_lv,
                 f"fiber_core_bend{v_suffix}",
-                self.fiber_cl1_bend_lv,
+                fiber_cl1_bend_lv,
                 self.registry,
             )
 
