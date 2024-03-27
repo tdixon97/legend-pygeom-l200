@@ -97,7 +97,7 @@ class ModuleFactoryBase(ABC):
     SIPM_OUTER_EXTRA = 0.2  # mm
     # To also stop stray light from directions more close to the fibers, the envelope extends a bit more
     # along the fibers:
-    SIPM_OVERLAP = 0.1  # mm
+    SIPM_OVERLAP = 0.3  # mm
     SIPM_GAP_SIDE = 0.01  # mm, for fitting problems with round "SiPMs" and square fibers.
 
     def __init__(
@@ -274,7 +274,7 @@ class ModuleFactoryBase(ABC):
 class ModuleFactorySingleFibers(ModuleFactoryBase):
     # for bent detailed fibers, the fibers would overlap a lot near the bottom SiPMs. To avoid
     # this, use a staggered design of the fibers.
-    ALLOWED_DELTA_LENGTHS = (-6.6, -4.95, -3.3, -1.65, 0, 1.65, 3.3, 4.95, 6.6)
+    ALLOWED_DELTA_LENGTHS = (-6.88, -5.16, -3.44, -1.72, 0, 1.72, 3.44, 5.16, 6.88)
 
     def _cached_sipm_volumes_bend(self) -> None:
         """Creates (dummy) SiPM volumes for use at the bottom of bent fiber sections."""
@@ -315,7 +315,7 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
             f"sipm_outer_bottom{v_suffix}",
             sipm_outer1,
             sipm_outer2,
-            [[0, 0, 0], [-self.SIPM_OUTER_EXTRA / 2, 0, 0]],
+            [[0, 0, 0], [+self.SIPM_OUTER_EXTRA / 2, 0, 0]],
             self.registry,
         )
         self.sipm_outer_bottom_lv_bend = g4.LogicalVolume(
@@ -587,7 +587,7 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                 )
 
                 sipm_placement_outer_r = (
-                    sipm_placement_r + self.SIPM_OUTER_EXTRA / 2 - self.SIPM_OVERLAP / 2 - self.SIPM_GAP
+                    sipm_placement_r - self.SIPM_OUTER_EXTRA / 2 + self.SIPM_OVERLAP / 2 - self.SIPM_GAP
                 )
                 x2 = sipm_placement_outer_r * math.cos(th)
                 y2 = sipm_placement_outer_r * math.sin(th)
@@ -778,7 +778,7 @@ class ModuleFactorySegment(ModuleFactoryBase):
         if self.bend_radius_mm is not None:
             g4.PhysicalVolume(
                 [0, 0, 0],
-                [0, 0, self.FIBER_DIM - dim_cl1],
+                [0, 0, 0],
                 fiber_cl1_bend_lv,
                 f"fiber_cl1_bend{v_suffix}",
                 self.fiber_cl2_bend_lv,
@@ -786,7 +786,7 @@ class ModuleFactorySegment(ModuleFactoryBase):
             )
             g4.PhysicalVolume(
                 [0, 0, 0],
-                [0, 0, self.FIBER_DIM - dim_core],
+                [0, 0, 0],
                 fiber_core_bend_lv,
                 f"fiber_core_bend{v_suffix}",
                 fiber_cl1_bend_lv,
@@ -817,17 +817,15 @@ class ModuleFactorySegment(ModuleFactoryBase):
                 "mm",
             )
             inner_lv = self.fiber_cl2_lv
-            z_displacement = 0
         else:
             angle = 2 * np.pi / self.number_of_modules
             z, r = self._get_bend_polycone(self.radius - coating_dim / 2, self.radius + coating_dim / 2)
             coating = g4.solid.GenericPolycone(v_name, 0, angle, r, z, self.registry, "mm")
             inner_lv = self.fiber_cl2_bend_lv
-            z_displacement = self.FIBER_DIM - coating_dim
         coating_lv = g4.LogicalVolume(coating, self.materials.tpb_on_fibers, v_name, self.registry)
         g4.PhysicalVolume(
             [0, 0, 0],
-            [0, 0, z_displacement],
+            [0, 0, 0],
             inner_lv,
             f"fiber_cl2{v_suffix}",
             coating_lv,
