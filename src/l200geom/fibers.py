@@ -283,7 +283,7 @@ class ModuleFactoryBase(ABC):
 class ModuleFactorySingleFibers(ModuleFactoryBase):
     # for bent detailed fibers, the fibers would overlap a lot near the bottom SiPMs. To avoid
     # this, use a staggered design of the fibers.
-    ALLOWED_DELTA_LENGTHS = (-6.88, -5.16, -3.44, -1.72, 0, 1.72, 3.44, 5.16, 6.88)
+    ALLOWED_DELTA_LENGTHS = (-6.96, -5.22, -3.48, -1.74, 0, 1.74, 3.48, 5.22, 6.96)
 
     def _cached_sipm_volumes_bend(self) -> None:
         """Creates (dummy) SiPM volumes for use at the bottom of bent fiber sections."""
