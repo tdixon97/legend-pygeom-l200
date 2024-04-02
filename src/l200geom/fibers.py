@@ -10,6 +10,7 @@ from pyg4ometry import geant4 as g4
 from scipy.spatial.transform import Rotation
 
 from . import materials
+from .det_utils import RemageDetectorInfo
 
 
 def place_fiber_modules(
@@ -38,6 +39,7 @@ def place_fiber_modules(
 
         assert getattr(mod, f"channel_{ch.location.position}_name") is None
         setattr(mod, f"channel_{ch.location.position}_name", ch.name)
+        setattr(mod, f"channel_{ch.location.position}_rawid", ch.daq.rawid)
 
     factory = ModuleFactorySingleFibers if use_detailed_fiber_model else ModuleFactorySegment
 
@@ -80,6 +82,8 @@ class FiberModuleData:
     tpb_thickness: float
     channel_top_name: str | None = None
     channel_bottom_name: str | None = None
+    channel_top_rawid: str | None = None
+    channel_bottom_rawid: str | None = None
 
 
 class ModuleFactoryBase(ABC):
@@ -261,6 +265,7 @@ class ModuleFactoryBase(ABC):
             mother_lv,
             self.registry,
         )
+        sipm_pv.pygeom_active_dector = RemageDetectorInfo("optical", sipm_detector_id)
         # Add border surface to mother volume.
         g4.BorderSurface(
             f"bsurface_lar_{sipm_name}",
@@ -596,6 +601,9 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                     f"{mod.channel_bottom_name}_{n}",
                     mother_lv,
                     self.registry,
+                )
+                sipm_pv.pygeom_active_dector = RemageDetectorInfo(
+                    "optical", mod.channel_bottom_rawid * 100 + n
                 )
                 # Add border surface to mother volume.
                 g4.BorderSurface(
@@ -953,6 +961,7 @@ class ModuleFactorySegment(ModuleFactoryBase):
                 mother_lv,
                 self.registry,
             )
+            sipm_pv.pygeom_active_dector = RemageDetectorInfo("optical", mod.channel_bottom_rawid)
             # Add border surface to mother volume.
             g4.BorderSurface(
                 f"bsurface_lar_{mod.channel_bottom_name}",
