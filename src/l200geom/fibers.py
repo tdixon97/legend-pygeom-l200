@@ -17,7 +17,7 @@ def place_fiber_modules(
     fiber_metadata: TextDB,
     ch_map: AttrsDict,
     mother_lv: g4.LogicalVolume,
-    mother_pv: g4.LogicalVolume,
+    mother_pv: g4.PhysicalVolume,
     materials: materials.OpticalMaterialRegistry,
     registry: g4.Registry,
     use_detailed_fiber_model: bool = False,
@@ -229,7 +229,7 @@ class ModuleFactoryBase(ABC):
         mod_name: str,
         mod: FiberModuleData,
         mother_lv: g4.LogicalVolume,
-        mother_pv: g4.LogicalVolume,
+        mother_pv: g4.PhysicalVolume,
         module_num: int,
         z_displacement: float,
     ) -> None:
@@ -241,7 +241,7 @@ class ModuleFactoryBase(ABC):
         fibers: list[g4.PhysicalVolume],
         is_top: bool,
         mother_lv: g4.LogicalVolume,
-        mother_pv: g4.LogicalVolume,
+        mother_pv: g4.PhysicalVolume,
         sipm_name: str,
         sipm_detector_id: int,
         z_displacement: float,
@@ -530,7 +530,7 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
         mod_name: str,
         mod: FiberModuleData,
         mother_lv: g4.LogicalVolume,
-        mother_pv: g4.LogicalVolume,
+        mother_pv: g4.PhysicalVolume,
         module_num: int,
         z_displacement: float,
     ) -> None:
@@ -547,6 +547,8 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
         start_angle = 2 * math.pi / self.number_of_modules * module_num
 
         fibers = []
+        sipm_multiunion = True
+        sipm_transforms = []
         for n in range(self.fiber_count_per_module):
             delta_length = 0
             if self.bend_radius_mm is not None:
@@ -594,25 +596,28 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                 x2 = sipm_placement_r * math.cos(th)
                 y2 = sipm_placement_r * math.sin(th)
                 z = z_displacement - self.fiber_length / 2 - delta_length - self.bend_radius_mm
-                sipm_pv = g4.PhysicalVolume(
-                    [0, 0, -th],
-                    [x2, y2, z],
-                    self.sipm_lv_bend,
-                    f"{mod.channel_bottom_name}_{n}",
-                    mother_lv,
-                    self.registry,
-                )
-                sipm_pv.pygeom_active_dector = RemageDetectorInfo(
-                    "optical", mod.channel_bottom_rawid * 100 + n
-                )
-                # Add border surface to mother volume.
-                g4.BorderSurface(
-                    f"bsurface_lar_{mod.channel_bottom_name}_{n}",
-                    mother_pv,
-                    sipm_pv,
-                    self.materials.surfaces.to_sipm_silicon,
-                    self.registry,
-                )
+                if not sipm_multiunion:
+                    sipm_pv = g4.PhysicalVolume(
+                        [0, 0, -th],
+                        [x2, y2, z],
+                        self.sipm_lv_bend,
+                        f"{mod.channel_bottom_name}_{n}",
+                        mother_lv,
+                        self.registry,
+                    )
+                    sipm_pv.pygeom_active_dector = RemageDetectorInfo(
+                        "optical", mod.channel_bottom_rawid * 100 + n
+                    )
+                    # Add border surface to mother volume.
+                    g4.BorderSurface(
+                        f"bsurface_lar_{mod.channel_bottom_name}_{n}",
+                        mother_pv,
+                        sipm_pv,
+                        self.materials.surfaces.to_sipm_silicon,
+                        self.registry,
+                    )
+                else:
+                    sipm_transforms.append([[0, 0, th], [x2, y2, z]])
 
                 sipm_placement_outer_r = (
                     sipm_placement_r - self.SIPM_OUTER_EXTRA / 2 + self.SIPM_OVERLAP / 2 - self.SIPM_GAP
@@ -649,6 +654,29 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                 mod.channel_bottom_name,
                 mod.channel_bottom_rawid,
                 z_displacement,
+            )
+
+        if self.bend_radius_mm is not None and sipm_multiunion:
+            sipm_vols = [self.sipm_bend] * len(sipm_transforms)
+            sipm_mu = g4.solid.MultiUnion(mod.channel_bottom_name, sipm_vols, sipm_transforms, self.registry)
+            sipm_mu_lv = g4.LogicalVolume(
+                sipm_mu, self.materials.metal_silicon, mod.channel_bottom_name, self.registry
+            )
+            sipm_pv = g4.PhysicalVolume(
+                [0, 0, 0],
+                [0, 0, 0],
+                sipm_mu_lv,
+                mod.channel_bottom_name,
+                mother_lv,
+                self.registry,
+            )
+            # Add border surface to mother volume.
+            g4.BorderSurface(
+                f"bsurface_lar_{mod.channel_bottom_name}",
+                mother_pv,
+                sipm_pv,
+                self.materials.surfaces.to_sipm_silicon,
+                self.registry,
             )
 
 
@@ -887,7 +915,7 @@ class ModuleFactorySegment(ModuleFactoryBase):
         mod_name: str,
         mod: FiberModuleData,
         mother_lv: g4.LogicalVolume,
-        mother_pv: g4.LogicalVolume,
+        mother_pv: g4.PhysicalVolume,
         module_num: int,
         z_displacement: float,
     ) -> None:
