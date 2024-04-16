@@ -63,7 +63,10 @@ def place_hpge_strings(
     else:
         hpge_string_config = AttrsDict(string_config)
 
+    # derive the strings from the channelmap.
     ch_map = ch_map.map("system", unique=False).geds.values()
+
+    strings_to_build = {}
 
     for hpge_meta in ch_map:
         # Temporary fix for gedet with null enrichment value
@@ -71,33 +74,79 @@ def place_hpge_strings(
             continue
 
         hpge_string_id = str(hpge_meta.location.string)
-        hpge_string = hpge_string_config.hpge_string[hpge_string_id]
         hpge_unit_id_in_string = hpge_meta.location.position
 
-        x_pos = hpge_string.radius_in_mm * math.cos(math.pi * hpge_string.angle_in_deg / 180)
+        if hpge_string_id not in strings_to_build:
+            strings_to_build[hpge_string_id] = {}
 
-        y_pos = hpge_string.radius_in_mm * math.sin(math.pi * hpge_string.angle_in_deg / 180)
+        hpge_extra_meta = hpge_string_config.hpges[hpge_meta.name]
+        strings_to_build[hpge_string_id][hpge_unit_id_in_string] = {
+            "name": hpge_meta.name,
+            "lv": make_hpge(hpge_meta, registry),
+            "height": hpge_meta.geometry.height_in_mm,
+            "baseplate": hpge_extra_meta["baseplate"],
+            "rodlength": hpge_extra_meta["rodlength_in_mm"],
+        }
 
-        z_pos = (
-            z0
-            - sum(hpge_string.hpge_unit_heights_in_mm[: hpge_unit_id_in_string - 1])
-            - hpge_string.hpge_unit_heights_in_mm[hpge_unit_id_in_string - 1] / 2
-        )
+    # build string for string
+    for string_id in strings_to_build:
+        string_slots = strings_to_build[string_id]
+        string_meta = hpge_string_config.hpge_string[string_id]
 
-        hpge = make_hpge(hpge_meta, registry)
+        x_pos = string_meta.radius_in_mm * math.cos(math.pi * string_meta.angle_in_deg / 180)
+        y_pos = string_meta.radius_in_mm * math.sin(math.pi * string_meta.angle_in_deg / 180)
 
-        geant4.PhysicalVolume(
-            [
-                0,
-                0,
-                0,
-            ],
-            [x_pos, y_pos, z_pos],
-            hpge,
-            hpge_meta.name,
-            mothervolume,
-            registry,
-        )
+        for hpge_unit_id_in_string in sorted(string_slots.keys()):
+            z_pos = (
+                z0
+                - sum(string_meta.hpge_unit_heights_in_mm[: hpge_unit_id_in_string - 1])
+                - string_meta.hpge_unit_heights_in_mm[hpge_unit_id_in_string - 1] / 2
+            )
+
+            det_unit = string_slots[hpge_unit_id_in_string]
+
+            geant4.PhysicalVolume(
+                [
+                    0,
+                    0,
+                    0,
+                ],
+                [x_pos, y_pos, z_pos],
+                det_unit["lv"],
+                det_unit["name"],
+                mothervolume,
+                registry,
+            )
+
+            pen_plate = _get_pen_plate(det_unit["baseplate"], materials, registry)
+            geant4.PhysicalVolume(
+                [  # TODO: correct rotation of plate
+                    0,
+                    0,
+                    0,
+                ],
+                [x_pos, y_pos, z_pos - 2],  # TODO: correct positioning of plate.
+                pen_plate,
+                det_unit["name"] + "_pen",
+                mothervolume,
+                registry,
+            )
+
+    # TODO: sample usage only! dimensions/placement are wrong.
+    # shroud_length = 2000
+    # ms = _get_nylon_mini_shroud(50, shroud_length, materials, registry)
+    # geant4.PhysicalVolume(
+    #    [
+    #        0,
+    #        0,
+    #        0,
+    #    ],
+    #    [x_pos, y_pos, z0 - shroud_length / 2],  # TODO: correct positioning of shroud.
+    #    ms,
+    #    ms.name + "_string_X",
+    #    mothervolume,
+    #    registry,
+    # )
 
 
 _pen_plate_cache = {}
