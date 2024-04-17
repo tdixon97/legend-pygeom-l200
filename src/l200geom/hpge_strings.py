@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
+from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
@@ -9,8 +11,11 @@ import pyg4ometry
 from legendhpges import make_hpge
 from legendmeta import AttrsDict
 from pyg4ometry import geant4
+from scipy.spatial.transform import Rotation
 
 from . import materials
+
+log = logging.getLogger(__name__)
 
 
 def place_hpge_strings(
@@ -71,7 +76,8 @@ def place_hpge_strings(
     for hpge_meta in ch_map:
         # Temporary fix for gedet with null enrichment value
         if hpge_meta.production.enrichment is None:
-            continue
+            log.warning("%s has no enrichment in metadata - setting to dummy value 0.86!", hpge_meta.name)
+            hpge_meta.production.enrichment = 0.86
 
         hpge_string_id = str(hpge_meta.location.string)
         hpge_unit_id_in_string = hpge_meta.location.position
@@ -80,73 +86,96 @@ def place_hpge_strings(
             strings_to_build[hpge_string_id] = {}
 
         hpge_extra_meta = hpge_string_config.hpges[hpge_meta.name]
-        strings_to_build[hpge_string_id][hpge_unit_id_in_string] = {
-            "name": hpge_meta.name,
-            "lv": make_hpge(hpge_meta, registry),
-            "height": hpge_meta.geometry.height_in_mm,
-            "baseplate": hpge_extra_meta["baseplate"],
-            "rodlength": hpge_extra_meta["rodlength_in_mm"],
-        }
+        strings_to_build[hpge_string_id][hpge_unit_id_in_string] = HPGeDetUnit(
+            hpge_meta.name,
+            make_hpge(hpge_meta, registry),
+            hpge_meta.geometry.height_in_mm,
+            hpge_extra_meta["baseplate"],
+            hpge_extra_meta["rodlength_in_mm"],
+        )
 
-    # build string for string
-    for string_id in strings_to_build:
-        string_slots = strings_to_build[string_id]
-        string_meta = hpge_string_config.hpge_string[string_id]
+    # now, build all strings.
+    for string_id, string in strings_to_build.items():
+        _place_hpge_string(string_id, string, hpge_string_config, z0, mothervolume, materials, registry)
 
-        x_pos = string_meta.radius_in_mm * math.cos(math.pi * string_meta.angle_in_deg / 180)
-        y_pos = string_meta.radius_in_mm * math.sin(math.pi * string_meta.angle_in_deg / 180)
 
-        for hpge_unit_id_in_string in sorted(string_slots.keys()):
-            z_pos = (
-                z0
-                - sum(string_meta.hpge_unit_heights_in_mm[: hpge_unit_id_in_string - 1])
-                - string_meta.hpge_unit_heights_in_mm[hpge_unit_id_in_string - 1] / 2
-            )
+@dataclass
+class HPGeDetUnit:
+    name: str
+    lv: geant4.LogicalVolume
+    height: float
+    baseplate: str
+    rodlength: float
 
-            det_unit = string_slots[hpge_unit_id_in_string]
 
-            geant4.PhysicalVolume(
-                [
-                    0,
-                    0,
-                    0,
-                ],
-                [x_pos, y_pos, z_pos],
-                det_unit["lv"],
-                det_unit["name"],
-                mothervolume,
-                registry,
-            )
+def _place_hpge_string(
+    string_id: str,
+    string_slots: list,
+    hpge_string_config: AttrsDict,
+    z0: float,
+    mothervolume: geant4.LogicalVolume,
+    materials: materials.OpticalMaterialRegistry,
+    registry: geant4.Registry,
+):
+    """
+    Place a single HPGe detector string.
 
-            pen_plate = _get_pen_plate(det_unit["baseplate"], materials, registry)
-            geant4.PhysicalVolume(
-                [  # TODO: correct rotation of plate
-                    0,
-                    0,
-                    0,
-                ],
-                [x_pos, y_pos, z_pos - 2],  # TODO: correct positioning of plate.
-                pen_plate,
-                det_unit["name"] + "_pen",
-                mothervolume,
-                registry,
-            )
+    This includes all PEN plates and the nylon shroud around the string."""
+    string_meta = hpge_string_config.hpge_string[string_id]
 
-    # TODO: sample usage only! dimensions/placement are wrong.
-    # shroud_length = 2000
-    # ms = _get_nylon_mini_shroud(50, shroud_length, materials, registry)
-    # geant4.PhysicalVolume(
-    #    [
-    #        0,
-    #        0,
-    #        0,
-    #    ],
-    #    [x_pos, y_pos, z0 - shroud_length / 2],  # TODO: correct positioning of shroud.
-    #    ms,
-    #    ms.name + "_string_X",
-    #    mothervolume,
-    #    registry,
-    # )
+    angle_in_rad = math.pi * string_meta.angle_in_deg / 180
+    x_pos = string_meta.radius_in_mm * math.cos(angle_in_rad)
+    y_pos = string_meta.radius_in_mm * math.sin(angle_in_rad)
+    # outermost rotation for all subvolumes.
+    string_rot = Rotation.from_euler("Z", math.pi - angle_in_rad)
+
+    z0_string = z0
+
+    # deliberately use max and range here. The code does not support sparse strings (i.e. with
+    # unpopulated slots, that are _not_ at the end. In those cases it should produce a KeyError.
+    max_unit_id = max(string_slots.keys())
+    delta_z = 0
+    for hpge_unit_id_in_string in range(1, max_unit_id + 1):
+        det_unit = string_slots[hpge_unit_id_in_string]
+
+        # convert the "warm" length of the rod to the (shorter) length in the cooled down state.
+        delta_z += det_unit.rodlength * 0.997
+
+        # all constants here are from MaGe
+        z_unit_bottom = z0_string - 11.1 - delta_z
+        z_unit_pen = z_unit_bottom + 7.1
+        z_pos_det = z_unit_pen + (4 - 0.025)
+
+        geant4.PhysicalVolume(
+            [0, 0, 0],
+            [x_pos, y_pos, z_pos_det],
+            det_unit.lv,
+            det_unit.name,
+            mothervolume,
+            registry,
+        )
+        det_unit.lv.pygeom_color_rgba = (0, 1, 1, 1)
+
+        pen_plate = _get_pen_plate(det_unit.baseplate, materials, registry)
+        geant4.PhysicalVolume(
+            list(string_rot.as_euler("xyz")),
+            [x_pos, y_pos, z_unit_pen],
+            pen_plate,
+            det_unit.name + "_pen",
+            mothervolume,
+            registry,
+        )
+
+    shroud_length = delta_z + 6  # offset 6 is from MaGe
+    ms = _get_nylon_mini_shroud(string_meta.minishroud_radius_in_mm, shroud_length, materials, registry)
+    geant4.PhysicalVolume(
+        [0, 0, 0],
+        [x_pos, y_pos, z0_string - shroud_length / 2],
+        ms,
+        ms.name + "_string_" + string_id,
+        mothervolume,
+        registry,
+    )
 
 
 _pen_plate_cache = {}
@@ -162,12 +191,21 @@ def _get_pen_plate(
         msg = f"Invalid PEN-plate size {size}"
         raise ValueError(msg)
 
+    # just for vis purposes...
+    colors = {
+        "small": (1, 0, 0, 1),
+        "medium": (0, 1, 0, 1),
+        "large": (0, 0, 1, 1),
+        "xlarge": (1, 1, 0, 1),
+    }
+
     if size not in _pen_plate_cache:
         pen_file = resources.files("l200geom") / "models" / f"BasePlate_{size}.stl"
         pen_solid = pyg4ometry.stl.Reader(
             pen_file, solidname=f"pen_{size}", centre=False, registry=registry
         ).getSolid()
         _pen_plate_cache[size] = geant4.LogicalVolume(pen_solid, materials.pen, f"pen_{size}", registry)
+        _pen_plate_cache[size].pygeom_color_rgba = colors[size]
 
     return _pen_plate_cache[size]
 
@@ -196,13 +234,14 @@ def _get_nylon_mini_shroud(
             registry,
         )
         # subtract the slightly smaller solid from the larger one, to get a hollow and closed volume.
-        shroud = geant4.solid.Subtraction("minishroud", outer, inner, [[0, 0, 0], [0, 0, 0]], registry)
+        shroud = geant4.solid.Subtraction(shroud_name, outer, inner, [[0, 0, 0], [0, 0, 0]], registry)
         _minishroud_cache[shroud_name] = geant4.LogicalVolume(
             shroud,
             materials.tpb_on_nylon,
             shroud_name,
             registry,
         )
+        _minishroud_cache[shroud_name].pygeom_color_rgba = (0, 0, 0, 0.1)
 
     # TODO: implement optical surfaces
     return _minishroud_cache[shroud_name]
