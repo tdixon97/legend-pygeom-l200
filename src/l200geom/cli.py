@@ -47,6 +47,11 @@ def dump_gdml_cli() -> None:
         help="""Filename to write a Geant4 macro file containing visualization attributes""",
     )
     parser.add_argument(
+        "--det-macro-file",
+        action="store",
+        help="""Filename to write a Geant4 macro file containing active detectors (to be used with remage)""",
+    )
+    parser.add_argument(
         "--check-overlaps",
         action="store_true",
         help="""Check for overlaps with pyg4ometry (note: this might not be accurate)""",
@@ -79,8 +84,8 @@ def dump_gdml_cli() -> None:
 
     if not args.visualize and args.filename == "":
         parser.error("no output file and no visualization specified")
-    if args.vis_macro_file and args.filename == "":
-        parser.error("writing visualization macro file without gdml file is not possible")
+    if (args.vis_macro_file or args.det_macro_file) and args.filename == "":
+        parser.error("writing macro file(s) without gdml file is not possible")
 
     if args.verbose:
         logging.getLogger("l200geom").setLevel(logging.DEBUG)
@@ -103,6 +108,11 @@ def dump_gdml_cli() -> None:
         w = gdml.Writer()
         w.addDetector(registry)
         w.write(args.filename)
+
+    if args.det_macro_file:
+        from . import det_utils
+
+        det_utils.generate_detector_macro(registry, args.det_macro_file)
 
     if args.vis_macro_file:
         from . import vis_utils

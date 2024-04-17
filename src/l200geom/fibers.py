@@ -10,12 +10,14 @@ from pyg4ometry import geant4 as g4
 from scipy.spatial.transform import Rotation
 
 from . import materials
+from .det_utils import RemageDetectorInfo
 
 
 def place_fiber_modules(
     fiber_metadata: TextDB,
     ch_map: AttrsDict,
     mother_lv: g4.LogicalVolume,
+    mother_pv: g4.PhysicalVolume,
     materials: materials.OpticalMaterialRegistry,
     registry: g4.Registry,
     use_detailed_fiber_model: bool = False,
@@ -35,30 +37,44 @@ def place_fiber_modules(
             )
             modules[ch.location.fiber] = mod
 
-        assert getattr(mod, f"channel_{ch.location.position}") is None
-        setattr(mod, f"channel_{ch.location.position}", ch.name)
+        assert getattr(mod, f"channel_{ch.location.position}_name") is None
+        setattr(mod, f"channel_{ch.location.position}_name", ch.name)
+        setattr(mod, f"channel_{ch.location.position}_rawid", ch.daq.rawid)
 
     factory = ModuleFactorySingleFibers if use_detailed_fiber_model else ModuleFactorySegment
 
-    # note: actually the radius is only 150mm and another short straight segment of 50mm is following after
+    z_displacement_fiber_assembly = 1700
+
+    # note: actually the radius is only 150mm and another short straight segment of 60mm is following after
     # the bend. to simplify things here, those two are combined to one bent shape, to have at least the same
     # covered solid angle.
-    ob_radius = 150 + 50
+    # we do not add the full straight part here (this would make the radius to large), but just a tiny delta
+    # that makes the bottom of the OB cover the whole area between the straight OB and IB fibers.
+    ob_radius_delta = 10
+    ob_radius_mm = 155 + ob_radius_delta
+    ob_inner_straight = 60 - ob_radius_delta
+    # this OB fiber length is derived from measurements in the CAD model, und might not be totally correct.
+    ob_fiber_length_mm = 1630
     ob_factory = factory(
-        radius_mm=590 / 2,
-        fiber_length_mm=1900 - math.pi * ob_radius / 2,
-        bend_radius_mm=ob_radius,
+        radius_mm=580 / 2,
+        fiber_length_mm=ob_fiber_length_mm - math.pi * ob_radius_mm / 2 - ob_inner_straight,
+        bend_radius_mm=ob_radius_mm,
         fiber_count_per_module=81,
         number_of_modules=20,
+        z_displacement_mm=z_displacement_fiber_assembly,
         registry=registry,
         materials=materials,
     )
+
+    ib_fiber_length_mm = 1400
+    ib_delta_z = 35
     ib_factory = factory(
-        radius_mm=269 / 2,
-        fiber_length_mm=1400,
+        radius_mm=260 / 2,
+        fiber_length_mm=ib_fiber_length_mm,
         bend_radius_mm=None,
         fiber_count_per_module=81,
         number_of_modules=9,
+        z_displacement_mm=z_displacement_fiber_assembly - ib_delta_z,
         registry=registry,
         materials=materials,
     )
@@ -68,17 +84,19 @@ def place_fiber_modules(
         assert m0 == m1
         module_num = int((m0 - 1) / 2)
         if mod.barrel == "outer":
-            ob_factory.create_module(mod_name, mod, mother_lv, module_num, z_displacement=+1000)
+            ob_factory.create_module(mod_name, mod, mother_lv, mother_pv, module_num)
         if mod.barrel == "inner":
-            ib_factory.create_module(mod_name, mod, mother_lv, module_num, z_displacement=+1250)
+            ib_factory.create_module(mod_name, mod, mother_lv, mother_pv, module_num)
 
 
 @dataclass
 class FiberModuleData:
     barrel: str
     tpb_thickness: float
-    channel_top: str | None = None
-    channel_bottom: str | None = None
+    channel_top_name: str | None = None
+    channel_bottom_name: str | None = None
+    channel_top_rawid: str | None = None
+    channel_bottom_rawid: str | None = None
 
 
 class ModuleFactoryBase(ABC):
@@ -107,6 +125,7 @@ class ModuleFactoryBase(ABC):
         fiber_count_per_module: int,
         bend_radius_mm: float | None,
         number_of_modules: int,
+        z_displacement_mm: float,
         materials: materials.OpticalMaterialRegistry,
         registry: g4.Registry,
     ):
@@ -125,12 +144,15 @@ class ModuleFactoryBase(ABC):
             radius of the bottom bend, or None if the fibers are not bent at the bottom end.
         number_of_modules
             number of modules that cover the full circle
+        z_displacement_mm
+            displacement of the top of the fiber barrel, relative to the global zero point.
         """
         self.radius = radius_mm
         self.fiber_length = fiber_length_mm
         self.fiber_count_per_module = fiber_count_per_module
         self.bend_radius_mm = bend_radius_mm
         self.number_of_modules = number_of_modules
+        self.z_displacement = z_displacement_mm
         self.materials = materials
         self.registry = registry
 
@@ -224,8 +246,8 @@ class ModuleFactoryBase(ABC):
         mod_name: str,
         mod: FiberModuleData,
         mother_lv: g4.LogicalVolume,
+        mother_pv: g4.PhysicalVolume,
         module_num: int,
-        z_displacement: float,
     ) -> None:
         raise NotImplementedError()
 
@@ -235,8 +257,10 @@ class ModuleFactoryBase(ABC):
         fibers: list[g4.PhysicalVolume],
         is_top: bool,
         mother_lv: g4.LogicalVolume,
+        mother_pv: g4.PhysicalVolume,
         sipm_name: str,
-        z_displacement: float,
+        sipm_detector_id: int,
+        z_displacement_straight: float,
     ) -> None:
         """Creates a (dummy) SiPM physical volume for use at the top/bottom of straight fiber sections."""
         z = +self.fiber_length / 2 + self.SIPM_HEIGHT / 2 + self.SIPM_GAP  # add small gap
@@ -246,10 +270,10 @@ class ModuleFactoryBase(ABC):
             else -z - self.SIPM_OUTER_EXTRA / 2 + self.SIPM_OVERLAP / 2 + self.SIPM_GAP
         )
         z = z if is_top else -z
-        z += z_displacement
-        z_outer += z_displacement
+        z += z_displacement_straight
+        z_outer += z_displacement_straight
         start_angle = 2 * math.pi / self.number_of_modules * module_num
-        g4.PhysicalVolume(
+        sipm_pv = g4.PhysicalVolume(
             [0, 0, -start_angle],
             [0, 0, z],
             self.sipm_lv,
@@ -257,6 +281,16 @@ class ModuleFactoryBase(ABC):
             mother_lv,
             self.registry,
         )
+        sipm_pv.pygeom_active_dector = RemageDetectorInfo("optical", sipm_detector_id)
+        # Add border surface to mother volume.
+        g4.BorderSurface(
+            f"bsurface_lar_{sipm_name}",
+            mother_pv,
+            sipm_pv,
+            self.materials.surfaces.to_sipm_silicon,
+            self.registry,
+        )
+
         g4.PhysicalVolume(
             [0, 0, -start_angle],
             [0, 0, z_outer],
@@ -266,15 +300,11 @@ class ModuleFactoryBase(ABC):
             self.registry,
         )
 
-        # TODO: Add border surfaces to all fibers in this segment.
-        # g4.BorderSurface(f'bsurface_lar_sipm{module_num}_{int(is_top)}', lar_phys, sipm_phys,
-        #    (mats.surface_sipm_top if is_top else mats.surface_sipm_bottom), self.registry)
-
 
 class ModuleFactorySingleFibers(ModuleFactoryBase):
     # for bent detailed fibers, the fibers would overlap a lot near the bottom SiPMs. To avoid
     # this, use a staggered design of the fibers.
-    ALLOWED_DELTA_LENGTHS = (-6.88, -5.16, -3.44, -1.72, 0, 1.72, 3.44, 5.16, 6.88)
+    ALLOWED_DELTA_LENGTHS = (-6.96, -5.22, -3.48, -1.74, 0, 1.74, 3.48, 5.22, 6.96)
 
     def _cached_sipm_volumes_bend(self) -> None:
         """Creates (dummy) SiPM volumes for use at the bottom of bent fiber sections."""
@@ -285,7 +315,7 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
 
         sipm_dim = self.FIBER_DIM + self.SIPM_GAP_SIDE  # GAP_SIDE to fit round->square
 
-        sipm = g4.solid.Box(
+        self.sipm_bend = g4.solid.Box(
             v_name,
             self.SIPM_HEIGHT,
             sipm_dim,
@@ -293,7 +323,9 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
             self.registry,
             "mm",
         )
-        self.sipm_lv_bend = g4.LogicalVolume(sipm, self.materials.metal_silicon, v_name, self.registry)
+        self.sipm_lv_bend = g4.LogicalVolume(
+            self.sipm_bend, self.materials.metal_silicon, v_name, self.registry
+        )
 
         sipm_outer1 = g4.solid.Box(
             f"sipm_outer1{v_suffix}",
@@ -514,8 +546,8 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
         mod_name: str,
         mod: FiberModuleData,
         mother_lv: g4.LogicalVolume,
+        mother_pv: g4.PhysicalVolume,
         module_num: int,
-        z_displacement: float,
     ) -> None:
         if module_num < 0 or module_num >= self.number_of_modules:
             msg = f"invalid module number {module_num} for a maximum of {self.number_of_modules}-1 modules."
@@ -529,7 +561,10 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
 
         start_angle = 2 * math.pi / self.number_of_modules * module_num
 
+        z_displacement_straight = self.z_displacement - self.fiber_length
+
         fibers = []
+        sipm_transforms = []  # transforms for SiPMs in the MultiUnion structure.
         for n in range(self.fiber_count_per_module):
             delta_length = 0
             if self.bend_radius_mm is not None:
@@ -550,7 +585,7 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
             fibers.append(
                 g4.PhysicalVolume(
                     [0, 0, -th],
-                    [x, y, z_displacement - delta_length / 2],
+                    [x, y, z_displacement_straight - delta_length / 2],
                     coating_lv,
                     f"fiber_{mod_name}_{n}",
                     mother_lv,
@@ -564,7 +599,7 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                 fibers.append(
                     g4.PhysicalVolume(
                         list(rotvec),
-                        [x2, y2, z_displacement - self.fiber_length / 2 - delta_length],
+                        [x2, y2, z_displacement_straight - self.fiber_length / 2 - delta_length],
                         coating_lv_bend,
                         f"fiber_bend_{mod_name}_{n}",
                         mother_lv,
@@ -576,15 +611,8 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                 sipm_placement_r = self.radius - self.bend_radius_mm - self.SIPM_GAP - self.SIPM_HEIGHT / 2
                 x2 = sipm_placement_r * math.cos(th)
                 y2 = sipm_placement_r * math.sin(th)
-                z = z_displacement - self.fiber_length / 2 - delta_length - self.bend_radius_mm
-                g4.PhysicalVolume(
-                    [0, 0, -th],
-                    [x2, y2, z],
-                    self.sipm_lv_bend,
-                    f"{mod.channel_bottom}_{n}",
-                    mother_lv,
-                    self.registry,
-                )
+                z = z_displacement_straight - self.fiber_length / 2 - delta_length - self.bend_radius_mm
+                sipm_transforms.append([[0, 0, th], [x2, y2, z]])
 
                 sipm_placement_outer_r = (
                     sipm_placement_r - self.SIPM_OUTER_EXTRA / 2 + self.SIPM_OVERLAP / 2 - self.SIPM_GAP
@@ -595,15 +623,56 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                     [0, 0, -th],
                     [x2, y2, z],
                     self.sipm_outer_bottom_lv_bend,
-                    f"{mod.channel_bottom}_{n}_wrap",
+                    f"{mod.channel_bottom_name}_{n}_wrap",
                     mother_lv,
                     self.registry,
                 )
 
         # create SiPMs and attach to fibers
-        self._create_sipm(module_num, fibers, True, mother_lv, mod.channel_top, z_displacement)
+        self._create_sipm(
+            module_num,
+            fibers,
+            True,
+            mother_lv,
+            mother_pv,
+            mod.channel_top_name,
+            mod.channel_top_rawid,
+            z_displacement_straight,
+        )
         if self.bend_radius_mm is None:
-            self._create_sipm(module_num, fibers, False, mother_lv, mod.channel_bottom, z_displacement)
+            self._create_sipm(
+                module_num,
+                fibers,
+                False,
+                mother_lv,
+                mother_pv,
+                mod.channel_bottom_name,
+                mod.channel_bottom_rawid,
+                z_displacement_straight,
+            )
+
+        if self.bend_radius_mm is not None:
+            sipm_vols = [self.sipm_bend] * len(sipm_transforms)
+            sipm_mu = g4.solid.MultiUnion(mod.channel_bottom_name, sipm_vols, sipm_transforms, self.registry)
+            sipm_mu_lv = g4.LogicalVolume(
+                sipm_mu, self.materials.metal_silicon, mod.channel_bottom_name, self.registry
+            )
+            sipm_pv = g4.PhysicalVolume(
+                [0, 0, 0],
+                [0, 0, 0],
+                sipm_mu_lv,
+                mod.channel_bottom_name,
+                mother_lv,
+                self.registry,
+            )
+            # Add border surface to mother volume.
+            g4.BorderSurface(
+                f"bsurface_lar_{mod.channel_bottom_name}",
+                mother_pv,
+                sipm_pv,
+                self.materials.surfaces.to_sipm_silicon,
+                self.registry,
+            )
 
 
 class ModuleFactorySegment(ModuleFactoryBase):
@@ -841,8 +910,8 @@ class ModuleFactorySegment(ModuleFactoryBase):
         mod_name: str,
         mod: FiberModuleData,
         mother_lv: g4.LogicalVolume,
+        mother_pv: g4.PhysicalVolume,
         module_num: int,
-        z_displacement: float,
     ) -> None:
         if module_num < 0 or module_num >= self.number_of_modules:
             msg = f"invalid module number {module_num} for a maximum of {self.number_of_modules}-1 modules."
@@ -856,13 +925,15 @@ class ModuleFactorySegment(ModuleFactoryBase):
             coating_lv_bend = self._cached_tpb_coating_volume(mod.tpb_thickness, bend=True)
 
         start_angle = 2 * math.pi / self.number_of_modules * (module_num)
+        z_displacement_straight = self.z_displacement - self.fiber_length / 2
+
         fibers = []
 
         th = start_angle
         fibers.append(
             g4.PhysicalVolume(
                 [0, 0, -th],
-                [0, 0, z_displacement],
+                [0, 0, z_displacement_straight],
                 coating_lv,
                 f"fiber_{mod_name}_s",
                 mother_lv,
@@ -873,7 +944,7 @@ class ModuleFactorySegment(ModuleFactoryBase):
             fibers.append(
                 g4.PhysicalVolume(
                     [0, 0, -th],
-                    [0, 0, z_displacement - self.fiber_length / 2 - self.bend_radius_mm],
+                    [0, 0, z_displacement_straight - self.fiber_length / 2 - self.bend_radius_mm],
                     coating_lv_bend,
                     f"fiber_bend_{mod_name}_s",
                     mother_lv,
@@ -882,25 +953,53 @@ class ModuleFactorySegment(ModuleFactoryBase):
             )
 
         # create SiPMs and attach to fibers
-        self._create_sipm(module_num, fibers, True, mother_lv, mod.channel_top, z_displacement)
+        self._create_sipm(
+            module_num,
+            fibers,
+            True,
+            mother_lv,
+            mother_pv,
+            mod.channel_top_name,
+            mod.channel_top_rawid,
+            z_displacement_straight,
+        )
         if self.bend_radius_mm is None:
-            self._create_sipm(module_num, fibers, False, mother_lv, mod.channel_bottom, z_displacement)
+            self._create_sipm(
+                module_num,
+                fibers,
+                False,
+                mother_lv,
+                mother_pv,
+                mod.channel_bottom_name,
+                mod.channel_bottom_rawid,
+                z_displacement_straight,
+            )
         else:
             start_angle = 2 * math.pi / self.number_of_modules * module_num
-            z = z_displacement - self.fiber_length / 2 - self.bend_radius_mm
-            g4.PhysicalVolume(
+            z = z_displacement_straight - self.fiber_length / 2 - self.bend_radius_mm
+            sipm_pv = g4.PhysicalVolume(
                 [0, 0, -start_angle],
                 [0, 0, z],
                 self.sipm_lv_bend,
-                mod.channel_bottom,
+                mod.channel_bottom_name,
                 mother_lv,
                 self.registry,
             )
+            sipm_pv.pygeom_active_dector = RemageDetectorInfo("optical", mod.channel_bottom_rawid)
+            # Add border surface to mother volume.
+            g4.BorderSurface(
+                f"bsurface_lar_{mod.channel_bottom_name}",
+                mother_pv,
+                sipm_pv,
+                self.materials.surfaces.to_sipm_silicon,
+                self.registry,
+            )
+
             g4.PhysicalVolume(
                 [0, 0, -start_angle],
                 [0, 0, z],
                 self.sipm_outer_bottom_lv_bend,
-                f"{mod.channel_bottom}_wrap",
+                f"{mod.channel_bottom_name}_wrap",
                 mother_lv,
                 self.registry,
             )

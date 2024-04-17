@@ -39,7 +39,7 @@ def construct(
     cryo.place_cryostat(cryostat_lv, world_lv, coordinate_z_displacement, reg)
 
     lar_lv = cryo.construct_argon(mats.liquidargon, reg)
-    cryo.place_argon(lar_lv, cryostat_lv, coordinate_z_displacement, reg)
+    lar_pv = cryo.place_argon(lar_lv, cryostat_lv, coordinate_z_displacement, reg)
 
     if "wlsr" in assemblies:
         # Place the WLSR into the cryostat.
@@ -63,6 +63,8 @@ def construct(
     # build fiber modules
     if "fibers" in assemblies:
         fiber_modules = lmeta.hardware.detectors.lar.fibers
-        fibers.place_fiber_modules(fiber_modules, channelmap, lar_lv, mats, reg, use_detailed_fiber_model)
+        fibers.place_fiber_modules(
+            fiber_modules, channelmap, lar_lv, lar_pv, mats, reg, use_detailed_fiber_model
+        )
 
     return reg
