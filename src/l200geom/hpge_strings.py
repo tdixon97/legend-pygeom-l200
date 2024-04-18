@@ -129,7 +129,9 @@ def _place_hpge_string(
     # outermost rotation for all subvolumes.
     string_rot = Rotation.from_euler("Z", math.pi - angle_in_rad)
 
-    z0_string = z0
+    # offset the height of the string by the length of the string support rod.
+    support, support_height = _get_support_structure(materials, registry)
+    z0_string = z0 - support_height
 
     # deliberately use max and range here. The code does not support sparse strings (i.e. with
     # unpopulated slots, that are _not_ at the end. In those cases it should produce a KeyError.
@@ -177,6 +179,16 @@ def _place_hpge_string(
         registry,
     )
 
+    support_rot = Rotation.from_euler("Z", 30 * math.pi / 180) * string_rot
+    geant4.PhysicalVolume(
+        list(support_rot.as_euler("xyz")),
+        [x_pos, y_pos, z0_string + 12],  # this offset of 12 is from MaGe
+        support,
+        support.name + "_string_" + string_id,
+        mothervolume,
+        registry,
+    )
+
 
 _pen_plate_cache = {}
 _minishroud_cache = {}
@@ -208,6 +220,30 @@ def _get_pen_plate(
         _pen_plate_cache[size].pygeom_color_rgba = colors[size]
 
     return _pen_plate_cache[size]
+
+
+def _get_support_structure(
+    materials: materials.OpticalMaterialRegistry,
+    registry: geant4.Registry,
+) -> tuple[geant4.LogicalVolume, float]:
+    if "string_support_structure" not in registry.solidDict:
+        support_file = resources.files("l200geom") / "models" / "StringSupportStructure.stl"
+        support_solid = pyg4ometry.stl.Reader(
+            support_file, solidname="string_support_structure", centre=False, registry=registry
+        ).getSolid()
+        support_lv = geant4.LogicalVolume(
+            support_solid, materials.metal_copper, "string_support_structure", registry
+        )
+        support_lv.pygeom_color_rgba = (0.72, 0.45, 0.2, 1)
+    else:
+        support_solid = registry.solidDict["string_support_structure"]
+        support_lv = registry.logicalVolumeDict["string_support_structure"]
+
+    # to get the height of the support structure, use the coordinates stored in the STL mesh.
+    z_coords = [c[2] for t in support_solid.meshtess for c in t[0]]
+    height = max(z_coords) - min(z_coords)
+
+    return support_lv, height
 
 
 def _get_nylon_mini_shroud(

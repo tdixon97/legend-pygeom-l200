@@ -2,3 +2,5 @@
 
 - `BasePlate_*.stl` are the PEN plates. Source: MaGe
   (`source/legendgeometry/stl_files/`)
+- `StringSupportStructure.stl` is the support rod for a HPGe string. Source: MaGe
+  (`source/legendgeometry/stl_files/`)

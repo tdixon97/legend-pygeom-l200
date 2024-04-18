@@ -3,6 +3,8 @@ ci:
   autoupdate_schedule: "quarterly"
   autofix_commit_msg: "style: pre-commit fixes"
 
+exclude: "^src/l200geom/models/"
+
 repos:
   - repo: https://github.com/adamchainz/blacken-docs
     rev: "1.16.0"
