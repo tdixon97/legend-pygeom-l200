@@ -14,6 +14,7 @@ from pyg4ometry import geant4
 from scipy.spatial.transform import Rotation
 
 from . import materials
+from .det_utils import RemageDetectorInfo
 
 log = logging.getLogger(__name__)
 
@@ -88,6 +89,7 @@ def place_hpge_strings(
         hpge_extra_meta = hpge_string_config.hpges[hpge_meta.name]
         strings_to_build[hpge_string_id][hpge_unit_id_in_string] = HPGeDetUnit(
             hpge_meta.name,
+            hpge_meta.daq.rawid,
             make_hpge(hpge_meta, registry),
             hpge_meta.geometry.height_in_mm,
             hpge_extra_meta["baseplate"],
@@ -102,6 +104,7 @@ def place_hpge_strings(
 @dataclass
 class HPGeDetUnit:
     name: str
+    rawid: int
     lv: geant4.LogicalVolume
     height: float
     baseplate: str
@@ -148,7 +151,7 @@ def _place_hpge_string(
         z_unit_pen = z_unit_bottom + 7.1
         z_pos_det = z_unit_pen + (4 - 0.025)
 
-        geant4.PhysicalVolume(
+        det_pv = geant4.PhysicalVolume(
             [0, 0, 0],
             [x_pos, y_pos, z_pos_det],
             det_unit.lv,
@@ -156,6 +159,7 @@ def _place_hpge_string(
             mothervolume,
             registry,
         )
+        det_pv.pygeom_active_dector = RemageDetectorInfo("germanium", det_unit.rawid)
         det_unit.lv.pygeom_color_rgba = (0, 1, 1, 1)
 
         pen_plate = _get_pen_plate(det_unit.baseplate, materials, registry)
