@@ -561,7 +561,7 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
 
         start_angle = 2 * math.pi / self.number_of_modules * module_num
 
-        z_displacement_straight = self.z_displacement - self.fiber_length
+        z_displacement_straight = self.z_displacement - self.fiber_length / 2
 
         fibers = []
         sipm_transforms = []  # transforms for SiPMs in the MultiUnion structure.
