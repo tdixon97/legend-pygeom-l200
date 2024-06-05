@@ -108,7 +108,8 @@ def place_hpge_strings(
     # all positions from MaGe, might be incorrect!
     geant4.PhysicalVolume(
         [0, 0, 0],
-        [121.472, -96.277, calib_tube_z],
+        # [121.472, -96.277, calib_tube_z],
+        [118.4352, -93.870075, calib_tube_z],  # to fix overlaps, not the physical position.
         calib_tube,
         "calibration_tube_1",
         mothervolume,
@@ -124,7 +125,8 @@ def place_hpge_strings(
     )
     geant4.PhysicalVolume(
         [0, 0, 0],
-        [-121.304, 96.48977, calib_tube_z],
+        # [-121.304, 96.48977, calib_tube_z],
+        [-118.4352, 93.870075, calib_tube_z],  # to fix overlaps, not the physical position.
         calib_tube,
         "calibration_tube_3",
         mothervolume,
@@ -132,7 +134,8 @@ def place_hpge_strings(
     )
     geant4.PhysicalVolume(
         [0, 0, 0],
-        [121.135, 96.70, calib_tube_z],
+        # [121.135, 96.70, calib_tube_z],
+        [120.9667, 96.9126, calib_tube_z],  # to fix overlaps, not the physical position.
         calib_tube,
         "calibration_tube_4",
         mothervolume,
