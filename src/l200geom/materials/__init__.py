@@ -7,6 +7,7 @@ import legendoptics.lar
 import legendoptics.nylon
 import legendoptics.pen
 import legendoptics.tpb
+import numpy as np
 import pint
 import pyg4ometry.geant4 as g4
 
@@ -166,13 +167,17 @@ class OpticalMaterialRegistry:
     def metal_caps_gold(self) -> g4.Material:
         """Gold for calibration source.
 
-        .. note:: modified density in order to have the equivalent of two 2x2cm gold 
+        .. note:: modified density in order to have the equivalent of two 2x2cm gold
             foils, with 20 um thickness.
         """
         if hasattr(self, "_metal_caps_gold"):
             return self._metal_caps_gold
 
-        volume_of_foil = np.pi * (1/8 * 2.54)**2 * 50e-4  # 1/4'' diameter, 50 um thickness
+        # quoting https://doi.org/10.1088/1748-0221/18/02/P02001:
+        # After the deposition, the external part of the foil with no 228Th
+        # activity was cut off, and the foil rolled
+
+        volume_of_foil = np.pi * (1 / 8 * 2.54) ** 2 * 50e-4  # 1/4” diameter, 50 um thickness
         volume_of_inner = np.pi * 0.2**2 * 0.4  # 2 cm radius, 4 cm height
         self._metal_caps_gold = g4.Material(
             name="metal_caps_gold",
@@ -190,7 +195,9 @@ class OpticalMaterialRegistry:
         if hasattr(self, "_peek"):
             return self._peek
 
-        self._peek = g4.Material(name="peek", density=1.320, number_of_components=3, registry=self.g4_registry)
+        self._peek = g4.Material(
+            name="peek", density=1.320, number_of_components=3, registry=self.g4_registry
+        )
         self._peek.add_element_natoms(self.get_element("C"), natoms=19)
         self._peek.add_element_natoms(self.get_element("H"), natoms=12)  # TODO: MaGe uses C19H1203??
         self._peek.add_element_natoms(self.get_element("O"), natoms=3)
