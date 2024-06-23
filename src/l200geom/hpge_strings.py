@@ -181,17 +181,21 @@ def _place_hpge_string(
     # deliberately use max and range here. The code does not support sparse strings (i.e. with
     # unpopulated slots, that are _not_ at the end. In those cases it should produce a KeyError.
     max_unit_id = max(string_slots.keys())
-    delta_z = 0
+    total_rod_length = 0
     for hpge_unit_id_in_string in range(1, max_unit_id + 1):
         det_unit = string_slots[hpge_unit_id_in_string]
 
         # convert the "warm" length of the rod to the (shorter) length in the cooled down state.
-        delta_z += det_unit.rodlength * 0.997
+        total_rod_length += det_unit.rodlength * 0.997
 
-        # all constants here are from MaGe
-        z_unit_bottom = z0_string - 11.1 - delta_z
-        z_unit_pen = z_unit_bottom + 7.1
-        z_pos_det = z_unit_pen + (4 - 0.025)
+        # all constants here are from MaGe:
+        # - there, the detector unit (DU)-local z coordinates are inverted in comparison to the
+        #   coordinates here, as well as to the string coordinates in MaGe.
+        # - the end of the three support rods is at +11.1 mm, the PEN plate at +4 mm, the diode at
+        #   -diodeHeight/2-0.025 mm, so that the crystal contact is at DU-z 0 mm.
+        z_unit_bottom = z0_string - total_rod_length
+        z_unit_pen = z_unit_bottom + (11.1 - 4)
+        z_pos_det = z_unit_pen + (4 + 0.025)
 
         det_pv = geant4.PhysicalVolume(
             [0, 0, 0],
@@ -214,7 +218,7 @@ def _place_hpge_string(
             registry,
         )
 
-    shroud_length = delta_z + 6  # offset 6 is from MaGe
+    shroud_length = total_rod_length + 6  # offset 6 is from MaGe
     ms = _get_nylon_mini_shroud(string_meta.minishroud_radius_in_mm, shroud_length, materials, registry)
     geant4.PhysicalVolume(
         [0, 0, 0],
