@@ -20,7 +20,7 @@ def _detector_macro_recursive(pv: g4.PhysicalVolume, macro_lines: dict) -> None:
     if hasattr(pv, "pygeom_active_dector") and pv.name not in macro_lines:
         det = pv.pygeom_active_dector
         assert isinstance(det, RemageDetectorInfo)
-        mac = f"/RMG/Geometry/RegisterDetector k{det.detector_type.title()} {pv.name} {det.uid}\n"
+        mac = f"/RMG/Geometry/RegisterDetector {det.detector_type.title()} {pv.name} {det.uid}\n"
         macro_lines[pv.name] = mac
 
     for dv in pv.logicalVolume.daughterVolumes:
