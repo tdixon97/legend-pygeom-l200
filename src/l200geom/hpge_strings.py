@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+import numpy as np
 import pyg4ometry
 from legendhpges import make_hpge
 from legendmeta import AttrsDict
@@ -106,42 +107,19 @@ def place_hpge_strings(
     calib_tube = _get_nylon_mini_shroud(20, calib_tube_length, materials, registry)
     calib_tube_z = z0 - calib_tube_length / 2
 
-    # all positions from MaGe, might be incorrect!
-    geant4.PhysicalVolume(
-        [0, 0, 0],
-        # [121.472, -96.277, calib_tube_z],
-        [118.4352, -93.870075, calib_tube_z],  # to fix overlaps, not the physical position.
-        calib_tube,
-        "calibration_tube_1",
-        mothervolume,
-        registry,
-    )
-    geant4.PhysicalVolume(
-        [0, 0, 0],
-        [-120.9667, -96.9126, calib_tube_z],
-        calib_tube,
-        "calibration_tube_2",
-        mothervolume,
-        registry,
-    )
-    geant4.PhysicalVolume(
-        [0, 0, 0],
-        # [-121.304, 96.48977, calib_tube_z],
-        [-118.4352, 93.870075, calib_tube_z],  # to fix overlaps, not the physical position.
-        calib_tube,
-        "calibration_tube_3",
-        mothervolume,
-        registry,
-    )
-    geant4.PhysicalVolume(
-        [0, 0, 0],
-        # [121.135, 96.70, calib_tube_z],
-        [120.9667, 96.9126, calib_tube_z],  # to fix overlaps, not the physical position.
-        calib_tube,
-        "calibration_tube_4",
-        mothervolume,
-        registry,
-    )
+    # all positions from CAD model.
+    calib_tube_r = 155  # mm
+    calib_tube_phi = np.deg2rad(np.array([338.57, 261.43, 158.57, 81.43]))
+    calib_tube_xy = np.array([calib_tube_r * np.cos(calib_tube_phi), -calib_tube_r * np.sin(calib_tube_phi)])
+    for i in range(4):
+        geant4.PhysicalVolume(
+            [0, 0, 0],
+            [*calib_tube_xy[:, i], calib_tube_z],
+            calib_tube,
+            f"calibration_tube_{i+1}",
+            mothervolume,
+            registry,
+        )
 
 
 @dataclass
@@ -172,7 +150,7 @@ def _place_hpge_string(
 
     angle_in_rad = math.pi * string_meta.angle_in_deg / 180
     x_pos = string_meta.radius_in_mm * math.cos(angle_in_rad)
-    y_pos = string_meta.radius_in_mm * math.sin(angle_in_rad)
+    y_pos = -string_meta.radius_in_mm * math.sin(angle_in_rad)
     # outermost rotation for all subvolumes.
     string_rot = Rotation.from_euler("Z", math.pi - angle_in_rad)
 
@@ -241,7 +219,8 @@ def _place_hpge_string(
                 registry,
             )
 
-    shroud_length = total_rod_length + 6  # offset 6 is from MaGe
+    # TODO: offset 6 is from MaGe. This is quite certainly incorrect, the mini shrouds extend above the string!
+    shroud_length = total_rod_length + 6
     ms = _get_nylon_mini_shroud(string_meta.minishroud_radius_in_mm, shroud_length, materials, registry)
     geant4.PhysicalVolume(
         [0, 0, 0],
