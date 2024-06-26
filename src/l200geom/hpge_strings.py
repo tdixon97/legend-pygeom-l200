@@ -89,6 +89,7 @@ def place_hpge_strings(
         hpge_extra_meta = hpge_string_config.hpges[hpge_meta.name]
         strings_to_build[hpge_string_id][hpge_unit_id_in_string] = HPGeDetUnit(
             hpge_meta.name,
+            hpge_meta.production.manufacturer,
             hpge_meta.daq.rawid,
             make_hpge(hpge_meta, registry),
             hpge_meta.geometry.height_in_mm,
@@ -146,6 +147,7 @@ def place_hpge_strings(
 @dataclass
 class HPGeDetUnit:
     name: str
+    manufacturer: str
     rawid: int
     lv: geant4.LogicalVolume
     height: float
@@ -208,6 +210,14 @@ def _place_hpge_string(
         det_pv.pygeom_active_dector = RemageDetectorInfo("germanium", det_unit.rawid)
         det_unit.lv.pygeom_color_rgba = (0, 1, 1, 1)
 
+        # a lot of Ortec detectors have modified medium plates.
+        if (
+            det_unit.name.startswith("V")
+            and det_unit.baseplate == "medium"
+            and det_unit.manufacturer == "Ortec"
+        ):
+            # TODO: what is with "V01389A"?
+            det_unit.baseplate = "medium_ortec"
         pen_plate = _get_pen_plate(det_unit.baseplate, materials, registry)
         geant4.PhysicalVolume(
             list(string_rot.as_euler("xyz")),
@@ -217,6 +227,19 @@ def _place_hpge_string(
             mothervolume,
             registry,
         )
+
+        # (Majorana) PPC detectors have a top PEN ring.
+        if det_unit.name.startswith("P"):
+            assert det_unit.baseplate == "small"
+            pen_plate = _get_pen_plate("ppc_small", materials, registry)
+            geant4.PhysicalVolume(
+                list(string_rot.as_euler("xyz")),
+                [x_pos, y_pos, z_pos_det + det_unit.height + 1.5 / 2],
+                pen_plate,
+                det_unit.name + "_pen_top",
+                mothervolume,
+                registry,
+            )
 
     shroud_length = total_rod_length + 6  # offset 6 is from MaGe
     ms = _get_nylon_mini_shroud(string_meta.minishroud_radius_in_mm, shroud_length, materials, registry)
@@ -249,7 +272,7 @@ def _get_pen_plate(
     materials: materials.OpticalMaterialRegistry,
     registry: geant4.Registry,
 ) -> geant4.LogicalVolume:
-    if size not in ["small", "medium", "large", "xlarge"]:
+    if size not in ["small", "medium", "medium_ortec", "large", "xlarge", "ppc_small"]:
         msg = f"Invalid PEN-plate size {size}"
         raise ValueError(msg)
 
@@ -257,12 +280,18 @@ def _get_pen_plate(
     colors = {
         "small": (1, 0, 0, 1),
         "medium": (0, 1, 0, 1),
+        "medium_ortec": (1, 0, 1, 1),
         "large": (0, 0, 1, 1),
         "xlarge": (1, 1, 0, 1),
+        "ppc_small": (1, 0, 0, 1),
     }
 
     if size not in _pen_plate_cache:
-        pen_file = resources.files("l200geom") / "models" / f"BasePlate_{size}.stl"
+        if size != "ppc_small":
+            pen_file = resources.files("l200geom") / "models" / f"BasePlate_{size}.stl"
+        else:
+            pen_file = resources.files("l200geom") / "models" / "TopPlate_ppc.stl"
+
         pen_solid = pyg4ometry.stl.Reader(
             pen_file, solidname=f"pen_{size}", centre=False, registry=registry
         ).getSolid()
