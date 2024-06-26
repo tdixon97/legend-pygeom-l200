@@ -12,7 +12,6 @@ import pyg4ometry
 from legendhpges import make_hpge
 from legendmeta import AttrsDict
 from pyg4ometry import geant4
-from scipy.spatial.transform import Rotation
 
 from . import materials
 from .det_utils import RemageDetectorInfo
@@ -151,8 +150,11 @@ def _place_hpge_string(
     angle_in_rad = math.pi * string_meta.angle_in_deg / 180
     x_pos = string_meta.radius_in_mm * math.cos(angle_in_rad)
     y_pos = -string_meta.radius_in_mm * math.sin(angle_in_rad)
-    # outermost rotation for all subvolumes.
-    string_rot = Rotation.from_euler("Z", math.pi - angle_in_rad)
+    # rotation angle for anything in the string.
+    string_rot = -np.pi + angle_in_rad
+    string_rot_m = np.array(
+        [[np.sin(string_rot), np.cos(string_rot)], [np.cos(string_rot), -np.sin(string_rot)]]
+    )
 
     # offset the height of the string by the length of the string support rod.
     support, support_height = _get_support_structure(materials, registry)
@@ -168,14 +170,17 @@ def _place_hpge_string(
         # convert the "warm" length of the rod to the (shorter) length in the cooled down state.
         total_rod_length += det_unit.rodlength * 0.997
 
-        # all constants here are from MaGe:
-        # - there, the detector unit (DU)-local z coordinates are inverted in comparison to the
-        #   coordinates here, as well as to the string coordinates in MaGe.
-        # - the end of the three support rods is at +11.1 mm, the PEN plate at +4 mm, the diode at
-        #   -diodeHeight/2-0.025 mm, so that the crystal contact is at DU-z 0 mm.
         z_unit_bottom = z0_string - total_rod_length
-        z_unit_pen = z_unit_bottom + (11.1 - 4)
-        z_pos_det = z_unit_pen + (4 + 0.025)
+        # - notes for those comparing this to MaGe (those offsets are not from there, but from the
+        #   CAD model): the detector unit (DU)-local z coordinates are inverted in comparison to
+        #   the coordinates here, as well as to the string coordinates in MaGe.
+        # - In MaGe, the end of the three support rods is at +11.1 mm, the PEN plate at +4 mm, the
+        #   diode at -diodeHeight/2-0.025 mm, so that the crystal contact is at DU-z 0 mm.
+        z_unit_pen = z_unit_bottom + 3.7 + 1.5 / 2  # from CAD model; 1.5 mm is the PEN thickness.
+        # - note from CAD model: the distance between PEN plate and detector bottom face varies a
+        #   lot between different diodes (i.e. BEGe's mostly (all?) have 2.1 mm face-to-face; for
+        #   PPCs this varies between 2.5 and 4 mm.)
+        z_pos_det = z_unit_pen + 4
 
         det_pv = geant4.PhysicalVolume(
             [0, 0, 0],
@@ -198,7 +203,7 @@ def _place_hpge_string(
             det_unit.baseplate = "medium_ortec"
         pen_plate = _get_pen_plate(det_unit.baseplate, materials, registry)
         geant4.PhysicalVolume(
-            list(string_rot.as_euler("xyz")),
+            [0, 0, string_rot],
             [x_pos, y_pos, z_unit_pen],
             pen_plate,
             det_unit.name + "_pen",
@@ -211,7 +216,7 @@ def _place_hpge_string(
             assert det_unit.baseplate == "small"
             pen_plate = _get_pen_plate("ppc_small", materials, registry)
             geant4.PhysicalVolume(
-                list(string_rot.as_euler("xyz")),
+                [0, 0, string_rot],
                 [x_pos, y_pos, z_pos_det + det_unit.height + 1.5 / 2],
                 pen_plate,
                 det_unit.name + "_pen_top",
@@ -224,17 +229,16 @@ def _place_hpge_string(
     ms = _get_nylon_mini_shroud(string_meta.minishroud_radius_in_mm, shroud_length, materials, registry)
     geant4.PhysicalVolume(
         [0, 0, 0],
-        [x_pos, y_pos, z0_string - shroud_length / 2],
+        [x_pos, y_pos, z0_string - shroud_length / 2 + 0.1],  # add the shroud thickness to avoid overlaps.
         ms,
         ms.name + "_string_" + string_id,
         mothervolume,
         registry,
     )
 
-    support_rot = Rotation.from_euler("Z", 30 * math.pi / 180) * string_rot
     geant4.PhysicalVolume(
-        list(support_rot.as_euler("xyz")),
-        [x_pos, y_pos, z0_string + 12],  # this offset of 12 is from MaGe
+        [0, 0, np.deg2rad(30) + string_rot],
+        [x_pos, y_pos, z0_string + 12],  # this offset of 12 is measured from the CAD file.
         support,
         support.name + "_string_" + string_id,
         mothervolume,
