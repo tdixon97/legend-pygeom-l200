@@ -245,6 +245,24 @@ def _place_hpge_string(
         registry,
     )
 
+    copper_rod_r = string_meta.rod_radius_in_mm
+    assert copper_rod_r < string_meta.minishroud_radius_in_mm - 0.75
+    copper_rod_name = f"string_{string_id}_cu_rod"
+    copper_rod = geant4.solid.Tubs(copper_rod_name, 0, 1.43, total_rod_length, 0, 2 * math.pi, registry)
+    copper_rod = geant4.LogicalVolume(copper_rod, materials.metal_copper, copper_rod_name, registry)
+    copper_rod.pygeom_color_rgba = (0.72, 0.45, 0.2, 1)
+    for i in range(3):
+        copper_rod_th = np.deg2rad(-30 - i * 120)
+        delta = copper_rod_r * string_rot_m @ np.array([np.cos(copper_rod_th), np.sin(copper_rod_th)])
+        geant4.PhysicalVolume(
+            [0, 0, 0],
+            [x_pos + delta[0], y_pos + delta[1], z0_string - total_rod_length / 2],
+            copper_rod,
+            f"{copper_rod_name}_{i}",
+            mothervolume,
+            registry,
+        )
+
 
 _pen_plate_cache = {}
 _minishroud_cache = {}

@@ -8,12 +8,17 @@
   - `angle_in_deg` → azimutal position of the string with respect to the
     positive x-direction
   - `minishroud_radius_in_mm` → radius of the minishroud of this string
+  - `rod_radius_in_mm` → placement radius of the support rod of this string
 
 ## HPGe detector unit configuration
 
 - `hpges` → HPGe detector name
+
   - `rodlength_in_mm` → length of the copper rods next to this detector. This is
     a "warm" length, i.e. it is multiplied by a factor < 1 to get the shorter
     rod length in the cryostat.
   - `baseplate` → size of the PEN plate below this detector (one value out of
     `small`, `medium`, `large`, `xlarge`)
+
+    Depending on the other detector properties, the value might be transformed,
+    i.e. for Ortec ICPCs to `medium_ortec`.
