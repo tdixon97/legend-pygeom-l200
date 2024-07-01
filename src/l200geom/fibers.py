@@ -16,12 +16,29 @@ from .det_utils import RemageDetectorInfo
 def place_fiber_modules(
     fiber_metadata: TextDB,
     ch_map: AttrsDict,
+    z0: float,
     mother_lv: g4.LogicalVolume,
     mother_pv: g4.PhysicalVolume,
     materials: materials.OpticalMaterialRegistry,
     registry: g4.Registry,
     use_detailed_fiber_model: bool = False,
 ) -> None:
+    """Construct LEGEND-200 HPGe strings.
+
+    Parameters
+    ----------
+    ch_map
+        LEGEND-200 channel map containing spms detectors
+        configuration in the string and their geometry.
+    string_config
+        LEGEND-200 germanium detector string configuration file.
+        Used to reconstruct the spatial position of each string.
+    z0
+        The z coordinate of the array top plate.
+    use_detailed_fiber_model
+        Switch between an implementation of single fibers (“detailed”) or
+        slabs of fiber material (“segmented”).
+    """
     # Unroll the provided metadata into a structure better suited for the next steps.
     # The geometry here is based on physical modules and not on channels.
     modules = {}
@@ -43,7 +60,10 @@ def place_fiber_modules(
 
     factory = ModuleFactorySingleFibers if use_detailed_fiber_model else ModuleFactorySegment
 
-    z_displacement_fiber_assembly = 1700
+    z_displacement_fiber_assembly = (
+        # avoid the overlap of the top SiPMs with the top plate.
+        z0 - 3 - ModuleFactoryBase.SIPM_HEIGHT - ModuleFactoryBase.SIPM_OUTER_EXTRA
+    )
 
     # note: actually the radius is only 150mm and another short straight segment of 60mm is following after
     # the bend. to simplify things here, those two are combined to one bent shape, to have at least the same

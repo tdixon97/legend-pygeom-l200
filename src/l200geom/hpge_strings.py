@@ -38,7 +38,7 @@ def place_hpge_strings(
         LEGEND-200 germanium detector string configuration file.
         Used to reconstruct the spatial position of each string.
     z0
-        The position of the top most slot of the strings in the z-axis.
+        The z coordinate of the top face of the array top plate.
     mothervolume
         pyg4ometry Geant4 LogicalVolume instance in which the strings
         are to be placed.
@@ -157,8 +157,9 @@ def _place_hpge_string(
     )
 
     # offset the height of the string by the length of the string support rod.
-    support, support_height = _get_support_structure(materials, registry)
-    z0_string = z0 - support_height
+    support = _get_support_structure(materials, registry)
+    # z0_string is the upper z coordinate of the topmost detector unit.
+    z0_string = z0 - 422.11  # from CAD model.
 
     # deliberately use max and range here. The code does not support sparse strings (i.e. with
     # unpopulated slots, that are _not_ at the end. In those cases it should produce a KeyError.
@@ -248,7 +249,9 @@ def _place_hpge_string(
     copper_rod_r = string_meta.rod_radius_in_mm
     assert copper_rod_r < string_meta.minishroud_radius_in_mm - 0.75
     copper_rod_name = f"string_{string_id}_cu_rod"
-    copper_rod = geant4.solid.Tubs(copper_rod_name, 0, 1.43, total_rod_length, 0, 2 * math.pi, registry)
+    copper_rod_length = total_rod_length + 3.5  # the copper rod is slightly longer after the last detector.
+    # the rod has a radius of 1.5 mm, but this would overlap with the coarse model of the PPC top PEN ring.
+    copper_rod = geant4.solid.Tubs(copper_rod_name, 0, 1.43, copper_rod_length, 0, 2 * math.pi, registry)
     copper_rod = geant4.LogicalVolume(copper_rod, materials.metal_copper, copper_rod_name, registry)
     copper_rod.pygeom_color_rgba = (0.72, 0.45, 0.2, 1)
     for i in range(3):
@@ -256,7 +259,7 @@ def _place_hpge_string(
         delta = copper_rod_r * string_rot_m @ np.array([np.cos(copper_rod_th), np.sin(copper_rod_th)])
         geant4.PhysicalVolume(
             [0, 0, 0],
-            [x_pos + delta[0], y_pos + delta[1], z0_string - total_rod_length / 2],
+            [x_pos + delta[0], y_pos + delta[1], z0_string - copper_rod_length / 2],
             copper_rod,
             f"{copper_rod_name}_{i}",
             mothervolume,
@@ -305,7 +308,8 @@ def _get_pen_plate(
 def _get_support_structure(
     materials: materials.OpticalMaterialRegistry,
     registry: geant4.Registry,
-) -> tuple[geant4.LogicalVolume, float]:
+) -> geant4.LogicalVolume:
+    """This model's origin is a the top face of the tripod structure."""
     if "string_support_structure" not in registry.solidDict:
         support_file = resources.files("l200geom") / "models" / "StringSupportStructure.stl"
         support_solid = pyg4ometry.stl.Reader(
@@ -319,11 +323,7 @@ def _get_support_structure(
         support_solid = registry.solidDict["string_support_structure"]
         support_lv = registry.logicalVolumeDict["string_support_structure"]
 
-    # to get the height of the support structure, use the coordinates stored in the STL mesh.
-    z_coords = [c[2] for t in support_solid.meshtess for c in t[0]]
-    height = max(z_coords) - min(z_coords)
-
-    return support_lv, height
+    return support_lv
 
 
 def _get_nylon_mini_shroud(
