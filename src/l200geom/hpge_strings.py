@@ -103,7 +103,7 @@ def place_hpge_strings(
 
     # place calibration tubes.
     calib_tube_length = 1400  # note: just a rough guess from MaGe
-    calib_tube = _get_nylon_mini_shroud(20, calib_tube_length, materials, registry)
+    calib_tube = _get_nylon_mini_shroud(18.25, calib_tube_length, materials, registry)  # radius from CAD.
     calib_tube_z = z0 - calib_tube_length / 2
 
     # all positions from CAD model.
