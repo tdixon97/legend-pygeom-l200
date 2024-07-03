@@ -8,3 +8,4 @@ Table of Contents
    :maxdepth: 1
 
    Package API reference <api/modules>
+   Coordinate systems <coordinate_systems>

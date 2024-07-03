@@ -7,11 +7,11 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+import numpy as np
 import pyg4ometry
 from legendhpges import make_hpge
 from legendmeta import AttrsDict
 from pyg4ometry import geant4
-from scipy.spatial.transform import Rotation
 
 from . import materials
 from .det_utils import RemageDetectorInfo
@@ -38,7 +38,7 @@ def place_hpge_strings(
         LEGEND-200 germanium detector string configuration file.
         Used to reconstruct the spatial position of each string.
     z0
-        The position of the top most slot of the strings in the z-axis.
+        The z coordinate of the top face of the array top plate.
     mothervolume
         pyg4ometry Geant4 LogicalVolume instance in which the strings
         are to be placed.
@@ -89,6 +89,7 @@ def place_hpge_strings(
         hpge_extra_meta = hpge_string_config.hpges[hpge_meta.name]
         strings_to_build[hpge_string_id][hpge_unit_id_in_string] = HPGeDetUnit(
             hpge_meta.name,
+            hpge_meta.production.manufacturer,
             hpge_meta.daq.rawid,
             make_hpge(hpge_meta, registry),
             hpge_meta.geometry.height_in_mm,
@@ -102,50 +103,28 @@ def place_hpge_strings(
 
     # place calibration tubes.
     calib_tube_length = 1400  # note: just a rough guess from MaGe
-    calib_tube = _get_nylon_mini_shroud(20, calib_tube_length, materials, registry)
+    calib_tube = _get_nylon_mini_shroud(18.25, calib_tube_length, materials, registry)  # radius from CAD.
     calib_tube_z = z0 - calib_tube_length / 2
 
-    # all positions from MaGe, might be incorrect!
-    geant4.PhysicalVolume(
-        [0, 0, 0],
-        # [121.472, -96.277, calib_tube_z],
-        [118.4352, -93.870075, calib_tube_z],  # to fix overlaps, not the physical position.
-        calib_tube,
-        "calibration_tube_1",
-        mothervolume,
-        registry,
-    )
-    geant4.PhysicalVolume(
-        [0, 0, 0],
-        [-120.9667, -96.9126, calib_tube_z],
-        calib_tube,
-        "calibration_tube_2",
-        mothervolume,
-        registry,
-    )
-    geant4.PhysicalVolume(
-        [0, 0, 0],
-        # [-121.304, 96.48977, calib_tube_z],
-        [-118.4352, 93.870075, calib_tube_z],  # to fix overlaps, not the physical position.
-        calib_tube,
-        "calibration_tube_3",
-        mothervolume,
-        registry,
-    )
-    geant4.PhysicalVolume(
-        [0, 0, 0],
-        # [121.135, 96.70, calib_tube_z],
-        [120.9667, 96.9126, calib_tube_z],  # to fix overlaps, not the physical position.
-        calib_tube,
-        "calibration_tube_4",
-        mothervolume,
-        registry,
-    )
+    # all positions from CAD model.
+    calib_tube_r = 155  # mm
+    calib_tube_phi = np.deg2rad(np.array([338.57, 261.43, 158.57, 81.43]))
+    calib_tube_xy = np.array([calib_tube_r * np.cos(calib_tube_phi), -calib_tube_r * np.sin(calib_tube_phi)])
+    for i in range(4):
+        geant4.PhysicalVolume(
+            [0, 0, 0],
+            [*calib_tube_xy[:, i], calib_tube_z],
+            calib_tube,
+            f"calibration_tube_{i+1}",
+            mothervolume,
+            registry,
+        )
 
 
 @dataclass
 class HPGeDetUnit:
     name: str
+    manufacturer: str
     rawid: int
     lv: geant4.LogicalVolume
     height: float
@@ -170,13 +149,17 @@ def _place_hpge_string(
 
     angle_in_rad = math.pi * string_meta.angle_in_deg / 180
     x_pos = string_meta.radius_in_mm * math.cos(angle_in_rad)
-    y_pos = string_meta.radius_in_mm * math.sin(angle_in_rad)
-    # outermost rotation for all subvolumes.
-    string_rot = Rotation.from_euler("Z", math.pi - angle_in_rad)
+    y_pos = -string_meta.radius_in_mm * math.sin(angle_in_rad)
+    # rotation angle for anything in the string.
+    string_rot = -np.pi + angle_in_rad
+    string_rot_m = np.array(
+        [[np.sin(string_rot), np.cos(string_rot)], [np.cos(string_rot), -np.sin(string_rot)]]
+    )
 
     # offset the height of the string by the length of the string support rod.
-    support, support_height = _get_support_structure(materials, registry)
-    z0_string = z0 - support_height
+    support = _get_support_structure(materials, registry)
+    # z0_string is the upper z coordinate of the topmost detector unit.
+    z0_string = z0 - 422.11  # from CAD model.
 
     # deliberately use max and range here. The code does not support sparse strings (i.e. with
     # unpopulated slots, that are _not_ at the end. In those cases it should produce a KeyError.
@@ -188,14 +171,17 @@ def _place_hpge_string(
         # convert the "warm" length of the rod to the (shorter) length in the cooled down state.
         total_rod_length += det_unit.rodlength * 0.997
 
-        # all constants here are from MaGe:
-        # - there, the detector unit (DU)-local z coordinates are inverted in comparison to the
-        #   coordinates here, as well as to the string coordinates in MaGe.
-        # - the end of the three support rods is at +11.1 mm, the PEN plate at +4 mm, the diode at
-        #   -diodeHeight/2-0.025 mm, so that the crystal contact is at DU-z 0 mm.
         z_unit_bottom = z0_string - total_rod_length
-        z_unit_pen = z_unit_bottom + (11.1 - 4)
-        z_pos_det = z_unit_pen + (4 + 0.025)
+        # - notes for those comparing this to MaGe (those offsets are not from there, but from the
+        #   CAD model): the detector unit (DU)-local z coordinates are inverted in comparison to
+        #   the coordinates here, as well as to the string coordinates in MaGe.
+        # - In MaGe, the end of the three support rods is at +11.1 mm, the PEN plate at +4 mm, the
+        #   diode at -diodeHeight/2-0.025 mm, so that the crystal contact is at DU-z 0 mm.
+        z_unit_pen = z_unit_bottom + 3.7 + 1.5 / 2  # from CAD model; 1.5 mm is the PEN thickness.
+        # - note from CAD model: the distance between PEN plate and detector bottom face varies a
+        #   lot between different diodes (i.e. BEGe's mostly (all?) have 2.1 mm face-to-face; for
+        #   PPCs this varies between 2.5 and 4 mm.)
+        z_pos_det = z_unit_pen + 4
 
         det_pv = geant4.PhysicalVolume(
             [0, 0, 0],
@@ -208,9 +194,17 @@ def _place_hpge_string(
         det_pv.pygeom_active_dector = RemageDetectorInfo("germanium", det_unit.rawid)
         det_unit.lv.pygeom_color_rgba = (0, 1, 1, 1)
 
+        # a lot of Ortec detectors have modified medium plates.
+        if (
+            det_unit.name.startswith("V")
+            and det_unit.baseplate == "medium"
+            and det_unit.manufacturer == "Ortec"
+        ):
+            # TODO: what is with "V01389A"?
+            det_unit.baseplate = "medium_ortec"
         pen_plate = _get_pen_plate(det_unit.baseplate, materials, registry)
         geant4.PhysicalVolume(
-            list(string_rot.as_euler("xyz")),
+            [0, 0, string_rot],
             [x_pos, y_pos, z_unit_pen],
             pen_plate,
             det_unit.name + "_pen",
@@ -218,26 +212,59 @@ def _place_hpge_string(
             registry,
         )
 
-    shroud_length = total_rod_length + 6  # offset 6 is from MaGe
+        # (Majorana) PPC detectors have a top PEN ring.
+        if det_unit.name.startswith("P"):
+            assert det_unit.baseplate == "small"
+            pen_plate = _get_pen_plate("ppc_small", materials, registry)
+            geant4.PhysicalVolume(
+                [0, 0, string_rot],
+                [x_pos, y_pos, z_pos_det + det_unit.height + 1.5 / 2],
+                pen_plate,
+                det_unit.name + "_pen_top",
+                mothervolume,
+                registry,
+            )
+
+    # TODO: offset 6 is from MaGe. This is quite certainly incorrect, the mini shrouds extend above the string!
+    shroud_length = total_rod_length + 6
     ms = _get_nylon_mini_shroud(string_meta.minishroud_radius_in_mm, shroud_length, materials, registry)
     geant4.PhysicalVolume(
         [0, 0, 0],
-        [x_pos, y_pos, z0_string - shroud_length / 2],
+        [x_pos, y_pos, z0_string - shroud_length / 2 + 0.1],  # add the shroud thickness to avoid overlaps.
         ms,
         ms.name + "_string_" + string_id,
         mothervolume,
         registry,
     )
 
-    support_rot = Rotation.from_euler("Z", 30 * math.pi / 180) * string_rot
     geant4.PhysicalVolume(
-        list(support_rot.as_euler("xyz")),
-        [x_pos, y_pos, z0_string + 12],  # this offset of 12 is from MaGe
+        [0, 0, np.deg2rad(30) + string_rot],
+        [x_pos, y_pos, z0_string + 12],  # this offset of 12 is measured from the CAD file.
         support,
         support.name + "_string_" + string_id,
         mothervolume,
         registry,
     )
+
+    copper_rod_r = string_meta.rod_radius_in_mm
+    assert copper_rod_r < string_meta.minishroud_radius_in_mm - 0.75
+    copper_rod_name = f"string_{string_id}_cu_rod"
+    copper_rod_length = total_rod_length + 3.5  # the copper rod is slightly longer after the last detector.
+    # the rod has a radius of 1.5 mm, but this would overlap with the coarse model of the PPC top PEN ring.
+    copper_rod = geant4.solid.Tubs(copper_rod_name, 0, 1.43, copper_rod_length, 0, 2 * math.pi, registry)
+    copper_rod = geant4.LogicalVolume(copper_rod, materials.metal_copper, copper_rod_name, registry)
+    copper_rod.pygeom_color_rgba = (0.72, 0.45, 0.2, 1)
+    for i in range(3):
+        copper_rod_th = np.deg2rad(-30 - i * 120)
+        delta = copper_rod_r * string_rot_m @ np.array([np.cos(copper_rod_th), np.sin(copper_rod_th)])
+        geant4.PhysicalVolume(
+            [0, 0, 0],
+            [x_pos + delta[0], y_pos + delta[1], z0_string - copper_rod_length / 2],
+            copper_rod,
+            f"{copper_rod_name}_{i}",
+            mothervolume,
+            registry,
+        )
 
 
 _pen_plate_cache = {}
@@ -249,7 +276,7 @@ def _get_pen_plate(
     materials: materials.OpticalMaterialRegistry,
     registry: geant4.Registry,
 ) -> geant4.LogicalVolume:
-    if size not in ["small", "medium", "large", "xlarge"]:
+    if size not in ["small", "medium", "medium_ortec", "large", "xlarge", "ppc_small"]:
         msg = f"Invalid PEN-plate size {size}"
         raise ValueError(msg)
 
@@ -257,12 +284,18 @@ def _get_pen_plate(
     colors = {
         "small": (1, 0, 0, 1),
         "medium": (0, 1, 0, 1),
+        "medium_ortec": (1, 0, 1, 1),
         "large": (0, 0, 1, 1),
         "xlarge": (1, 1, 0, 1),
+        "ppc_small": (1, 0, 0, 1),
     }
 
     if size not in _pen_plate_cache:
-        pen_file = resources.files("l200geom") / "models" / f"BasePlate_{size}.stl"
+        if size != "ppc_small":
+            pen_file = resources.files("l200geom") / "models" / f"BasePlate_{size}.stl"
+        else:
+            pen_file = resources.files("l200geom") / "models" / "TopPlate_ppc.stl"
+
         pen_solid = pyg4ometry.stl.Reader(
             pen_file, solidname=f"pen_{size}", centre=False, registry=registry
         ).getSolid()
@@ -275,7 +308,8 @@ def _get_pen_plate(
 def _get_support_structure(
     materials: materials.OpticalMaterialRegistry,
     registry: geant4.Registry,
-) -> tuple[geant4.LogicalVolume, float]:
+) -> geant4.LogicalVolume:
+    """This model's origin is a the top face of the tripod structure."""
     if "string_support_structure" not in registry.solidDict:
         support_file = resources.files("l200geom") / "models" / "StringSupportStructure.stl"
         support_solid = pyg4ometry.stl.Reader(
@@ -289,11 +323,7 @@ def _get_support_structure(
         support_solid = registry.solidDict["string_support_structure"]
         support_lv = registry.logicalVolumeDict["string_support_structure"]
 
-    # to get the height of the support structure, use the coordinates stored in the STL mesh.
-    z_coords = [c[2] for t in support_solid.meshtess for c in t[0]]
-    height = max(z_coords) - min(z_coords)
-
-    return support_lv, height
+    return support_lv
 
 
 def _get_nylon_mini_shroud(

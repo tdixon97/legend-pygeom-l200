@@ -5,12 +5,12 @@ from importlib import resources
 from legendmeta import LegendMetadata, TextDB
 from pyg4ometry import geant4
 
-from . import cryo, fibers, hpge_strings, materials, wlsr
+from . import cryo, fibers, hpge_strings, materials, top, wlsr
 
 lmeta = LegendMetadata()
 configs = TextDB(resources.files("l200geom") / "configs")
 
-DEFINED_ASSEMBLIES = ["wlsr", "strings", "fibers"]
+DEFINED_ASSEMBLIES = ["wlsr", "strings", "fibers", "top"]
 
 
 def construct(
@@ -57,14 +57,19 @@ def construct(
     # Place the germanium detector array inside the liquid argon
     hpge_string_config = configs.on("20230311T235840Z")
 
+    # top of the top plate, this is still a dummy value!
+    top_plate_z_pos = 1700
+
     if "strings" in assemblies:
-        hpge_strings.place_hpge_strings(channelmap, hpge_string_config, 1700, lar_lv, mats, reg)
+        hpge_strings.place_hpge_strings(channelmap, hpge_string_config, top_plate_z_pos, lar_lv, mats, reg)
+    if "top" in assemblies:
+        top.place_top_plate(top_plate_z_pos, lar_lv, mats, reg)
 
     # build fiber modules
     if "fibers" in assemblies:
         fiber_modules = lmeta.hardware.detectors.lar.fibers
         fibers.place_fiber_modules(
-            fiber_modules, channelmap, lar_lv, lar_pv, mats, reg, use_detailed_fiber_model
+            fiber_modules, channelmap, top_plate_z_pos, lar_lv, lar_pv, mats, reg, use_detailed_fiber_model
         )
 
     return reg
