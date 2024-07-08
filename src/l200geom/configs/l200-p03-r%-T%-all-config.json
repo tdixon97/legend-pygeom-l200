@@ -63,7 +63,7 @@
     "11": {
       "radius_in_mm": 218,
       "angle_in_deg": 0,
-      "minishroud_radius_in_mm": 51.0,
+      "minishroud_radius_in_mm": 44.0,
       "rod_radius_in_mm": 39.5
     },
     "12": {

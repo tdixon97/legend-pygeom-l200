@@ -140,7 +140,9 @@ def _place_hpge_string(
     # offset the height of the string by the length of the string support rod.
     support = _get_support_structure(materials, registry)
     # z0_string is the upper z coordinate of the topmost detector unit.
-    z0_string = z0 - 422.11  # from CAD model.
+    # TODO: real measurements (slides of M. Bush on 2024-07-08) show an additional offset -0.6 mm.
+    # TODO: this is also still a warm length.
+    z0_string = z0 - 410.1 - 12  # from CAD model.
 
     # deliberately use max and range here. The code does not support sparse strings (i.e. with
     # unpopulated slots, that are _not_ at the end. In those cases it should produce a KeyError.
@@ -158,11 +160,14 @@ def _place_hpge_string(
         #   the coordinates here, as well as to the string coordinates in MaGe.
         # - In MaGe, the end of the three support rods is at +11.1 mm, the PEN plate at +4 mm, the
         #   diode at -diodeHeight/2-0.025 mm, so that the crystal contact is at DU-z 0 mm.
-        z_unit_pen = z_unit_bottom + 3.7 + 1.5 / 2  # from CAD model; 1.5 mm is the PEN thickness.
-        # - note from CAD model: the distance between PEN plate and detector bottom face varies a
-        #   lot between different diodes (i.e. BEGe's mostly (all?) have 2.1 mm face-to-face; for
-        #   PPCs this varies between 2.5 and 4 mm.)
-        z_pos_det = z_unit_pen + 4
+        pen_thickness = 1.5  #  mm
+        # 3.7 mm from CAD model; the offset 1.3 mm is from updated slides of M. Bush on 2024-07-08.
+        z_unit_pen = z_unit_bottom + 3.7 + 1.3 + pen_thickness / 2
+
+        # - note from CAD model: the distance between PEN plate top and detector bottom face varies
+        #   a lot between different diodes (i.e. BEGe's/IC's all(?) use a single standard insulator
+        #   type, and have a distance of 2.1 mm; for PPCs this varies between ca. 2.5 and 4 mm.)
+        z_pos_det = z_unit_pen + pen_thickness / 2 + (2.1 if not det_unit.name.startswith("P") else 3)
 
         det_pv = geant4.PhysicalVolume(
             [0, 0, 0],
@@ -206,7 +211,7 @@ def _place_hpge_string(
                 registry,
             )
 
-    # TODO: offset 6 is from MaGe. This is quite certainly incorrect, the mini shrouds extend above the string!
+    # TODO: offset 6 is from MaGe. This is certainly incorrect, some mini shrouds extend above the string!
     shroud_length = total_rod_length + 6
     ms = _get_nylon_mini_shroud(
         string_meta.minishroud_radius_in_mm, shroud_length, False, materials, registry
@@ -252,6 +257,8 @@ def _place_hpge_string(
 
 _pen_plate_cache = {}
 _minishroud_cache = {}
+# Those dimensions are from an email from A. Lubashevskiy to L. Varriano on Dec 12, 2023; on the NMS made at
+# TUM in May 2022.
 MINISHROUD_THICKNESS = 0.125  # mm
 MINISHROUD_END_THICKNESS = 2 * MINISHROUD_THICKNESS
 
