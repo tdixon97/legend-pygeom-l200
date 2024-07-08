@@ -213,7 +213,7 @@ def _place_hpge_string(
     )
     geant4.PhysicalVolume(
         [0, 0, 0],
-        [x_pos, y_pos, z0_string - shroud_length / 2 + 0.1],  # add the shroud thickness to avoid overlaps.
+        [x_pos, y_pos, z0_string - shroud_length / 2 + MINISHROUD_END_THICKNESS],
         ms,
         ms.name + "_string_" + string_id,
         mothervolume,
@@ -252,6 +252,8 @@ def _place_hpge_string(
 
 _pen_plate_cache = {}
 _minishroud_cache = {}
+MINISHROUD_THICKNESS = 0.125  # mm
+MINISHROUD_END_THICKNESS = 2 * MINISHROUD_THICKNESS
 
 
 def _get_pen_plate(
@@ -322,21 +324,19 @@ def _get_nylon_mini_shroud(
     """
     shroud_name = f"minishroud_{radius}x{length}"
     if shroud_name not in _minishroud_cache:
-        shroudThickness = 0.125  # mm
-        endThickness = 2 * shroudThickness
         outer = geant4.solid.Tubs(f"{shroud_name}_outer", 0, radius, length, 0, 2 * math.pi, registry)
         inner = geant4.solid.Tubs(
             f"{shroud_name}_inner",
             0,
-            radius - shroudThickness,
+            radius - MINISHROUD_THICKNESS,
             # at the top/bottom, the NMS has essentially two layers.
-            length - (0 if top_open else 2 * endThickness),
+            length - (0 if top_open else 2 * MINISHROUD_END_THICKNESS),
             0,
             2 * math.pi,
             registry,
         )
         # subtract the slightly smaller solid from the larger one, to get a hollow and closed volume.
-        inner_z = (1 if top_open else 0) * endThickness
+        inner_z = (1 if top_open else 0) * MINISHROUD_END_THICKNESS
         shroud = geant4.solid.Subtraction(shroud_name, outer, inner, [[0, 0, 0], [0, 0, inner_z]], registry)
         _minishroud_cache[shroud_name] = geant4.LogicalVolume(
             shroud,
