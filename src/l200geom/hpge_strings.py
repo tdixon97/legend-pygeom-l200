@@ -12,6 +12,7 @@ import pyg4ometry
 from legendhpges import make_hpge
 from legendmeta import AttrsDict
 from pyg4ometry import geant4
+from scipy.spatial.transform import Rotation
 
 from . import materials
 from .det_utils import RemageDetectorInfo
@@ -189,8 +190,16 @@ def _place_hpge_string(
             # TODO: what is with "V01389A"?
             det_unit.baseplate = "medium_ortec"
         pen_plate = _get_pen_plate(det_unit.baseplate, materials, registry)
+
+        # This rotation is not physical, but gets us closer to the real model of the PEN plates.
+        # In the CAD model, most plates are mirrored, compared to reality (some are also correct in the
+        # first place), i.e. how the plates in PGT were produced. So the STL mesh is also mirrored, so
+        # flip it over.
+        # note/TODO: this rotation should be replaced by a correct mesh, so that the counterbores are
+        # on the correct side. This might be necessary to fit in other parts!
+        pen_rot = Rotation.from_euler("XZ", [-math.pi, string_rot]).as_euler("xyz")
         geant4.PhysicalVolume(
-            [0, 0, string_rot],
+            list(pen_rot),
             [x_pos, y_pos, z_unit_pen],
             pen_plate,
             det_unit.name + "_pen",
