@@ -28,6 +28,7 @@
       "radius_in_mm": 218,
       "angle_in_deg": 180,
       "minishroud_radius_in_mm": 54.0,
+      "minishroud_delta_length_in_mm": -200,
       "rod_radius_in_mm": 49.5
     },
     "6": {

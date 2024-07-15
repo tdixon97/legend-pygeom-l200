@@ -139,7 +139,6 @@ def _place_hpge_string(
     )
 
     # offset the height of the string by the length of the string support rod.
-    support = _get_support_structure(materials, registry)
     # z0_string is the upper z coordinate of the topmost detector unit.
     # TODO: real measurements (slides of M. Bush on 2024-07-08) show an additional offset -0.6 mm.
     # TODO: this is also still a warm length.
@@ -220,33 +219,52 @@ def _place_hpge_string(
                 registry,
             )
 
-    # TODO: offset 6 is from MaGe. This is certainly incorrect, some mini shrouds extend above the string!
-    shroud_length = total_rod_length + 6
-    ms = _get_nylon_mini_shroud(
-        string_meta.minishroud_radius_in_mm, shroud_length, False, materials, registry
+    copper_rod_length = total_rod_length + 3.5  # the copper rod is slightly longer after the last detector.
+
+    minishroud_length = MINISHROUD_LENGTH[0] + string_meta.get("minishroud_delta_length_in_mm", 0)
+    assert total_rod_length < minishroud_length
+    nms = _get_nylon_mini_shroud(
+        string_meta.minishroud_radius_in_mm, minishroud_length, True, materials, registry
     )
     geant4.PhysicalVolume(
         [0, 0, 0],
-        [x_pos, y_pos, z0_string - shroud_length / 2 + MINISHROUD_END_THICKNESS],
-        ms,
-        ms.name + "_string_" + string_id,
+        [x_pos, y_pos, z0_string - copper_rod_length + minishroud_length / 2 - MINISHROUD_END_THICKNESS],
+        nms,
+        nms.name + "_string_" + string_id,
+        mothervolume,
+        registry,
+    )
+    nms_top = _get_nylon_mini_shroud(
+        string_meta.minishroud_radius_in_mm - MINISHROUD_END_THICKNESS,
+        MINISHROUD_LENGTH[1],
+        True,
+        materials,
+        registry,
+        min_radius=10,
+    )
+    geant4.PhysicalVolume(
+        [0, 0, 0],
+        [x_pos, y_pos, z0_string + 15 + MINISHROUD_LENGTH[1] / 2],
+        nms_top,
+        nms_top.name + "_string_" + string_id,
         mothervolume,
         registry,
     )
 
-    geant4.PhysicalVolume(
-        [0, 0, np.deg2rad(30) + string_rot],
-        [x_pos, y_pos, z0_string + 12],  # this offset of 12 is measured from the CAD file.
-        support,
-        support.name + "_string_" + string_id,
-        mothervolume,
-        registry,
-    )
+    # TODO: add back support structure that now overlaps with NMS.
+    # support = _get_support_structure(materials, registry)
+    # geant4.PhysicalVolume(
+    #    [0, 0, np.deg2rad(30) + string_rot],
+    #    [x_pos, y_pos, z0_string + 12],  # this offset of 12 is measured from the CAD file.
+    #    support,
+    #    support.name + "_string_" + string_id,
+    #    mothervolume,
+    #    registry,
+    # )
 
     copper_rod_r = string_meta.rod_radius_in_mm
     assert copper_rod_r < string_meta.minishroud_radius_in_mm - 0.75
     copper_rod_name = f"string_{string_id}_cu_rod"
-    copper_rod_length = total_rod_length + 3.5  # the copper rod is slightly longer after the last detector.
     # the rod has a radius of 1.5 mm, but this would overlap with the coarse model of the PPC top PEN ring.
     copper_rod = geant4.solid.Tubs(copper_rod_name, 0, 1.43, copper_rod_length, 0, 2 * math.pi, registry)
     copper_rod = geant4.LogicalVolume(copper_rod, materials.metal_copper, copper_rod_name, registry)
@@ -270,6 +288,7 @@ _minishroud_cache = {}
 # TUM in May 2022.
 MINISHROUD_THICKNESS = 0.125  # mm
 MINISHROUD_END_THICKNESS = 2 * MINISHROUD_THICKNESS
+MINISHROUD_LENGTH = (1000, 20)
 
 
 def _get_pen_plate(
@@ -333,14 +352,16 @@ def _get_nylon_mini_shroud(
     top_open: bool,
     materials: materials.OpticalMaterialRegistry,
     registry: geant4.Registry,
+    min_radius: int = 0,
 ) -> geant4.LogicalVolume:
-    """Create a nylon/TPB funnel of the given outer dimensions, which will be closed at the top/bottom.
+    """Create a nylon/TPB funnel of the given outer dimensions, which will be closed at the bottom.
 
     .. note:: this can also be used for calibration tubes.
     """
+    assert top_open  # just for b/c of this shared interface. remove in future.
     shroud_name = f"minishroud_{radius}x{length}"
     if shroud_name not in _minishroud_cache:
-        outer = geant4.solid.Tubs(f"{shroud_name}_outer", 0, radius, length, 0, 2 * math.pi, registry)
+        outer = geant4.solid.Tubs(f"{shroud_name}_outer", min_radius, radius, length, 0, 2 * np.pi, registry)
         inner = geant4.solid.Tubs(
             f"{shroud_name}_inner",
             0,
@@ -348,7 +369,7 @@ def _get_nylon_mini_shroud(
             # at the top/bottom, the NMS has essentially two layers.
             length - (0 if top_open else 2 * MINISHROUD_END_THICKNESS),
             0,
-            2 * math.pi,
+            2 * np.pi,
             registry,
         )
         # subtract the slightly smaller solid from the larger one, to get a hollow and closed volume.
