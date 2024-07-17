@@ -180,6 +180,7 @@ def _place_hpge_string(
         det_pv.pygeom_active_dector = RemageDetectorInfo("germanium", det_unit.rawid)
         det_unit.lv.pygeom_color_rgba = (0, 1, 1, 1)
 
+        baseplate = det_unit.baseplate
         # a lot of Ortec detectors have modified medium plates.
         if (
             det_unit.name.startswith("V")
@@ -187,8 +188,8 @@ def _place_hpge_string(
             and det_unit.manufacturer == "Ortec"
         ):
             # TODO: what is with "V01389A"?
-            det_unit.baseplate = "medium_ortec"
-        pen_plate = _get_pen_plate(det_unit.baseplate, materials, registry)
+            baseplate = "medium_ortec"
+        pen_plate = _get_pen_plate(baseplate, materials, registry)
 
         # This rotation is not physical, but gets us closer to the real model of the PEN plates.
         # In the CAD model, most plates are mirrored, compared to reality (some are also correct in the
@@ -219,16 +220,19 @@ def _place_hpge_string(
                 registry,
             )
 
-    copper_rod_length = total_rod_length + 3.5  # the copper rod is slightly longer after the last detector.
+    # the copper rod is slightly longer after the last detector.
+    copper_rod_length_from_z0 = total_rod_length + 3.5
+    copper_rod_length = copper_rod_length_from_z0 + 12
 
     minishroud_length = MINISHROUD_LENGTH[0] + string_meta.get("minishroud_delta_length_in_mm", 0)
     assert total_rod_length < minishroud_length
     nms = _get_nylon_mini_shroud(
         string_meta.minishroud_radius_in_mm, minishroud_length, True, materials, registry
     )
+    z_nms = z0_string - copper_rod_length_from_z0 + minishroud_length / 2 - MINISHROUD_END_THICKNESS
     geant4.PhysicalVolume(
         [0, 0, 0],
-        [x_pos, y_pos, z0_string - copper_rod_length + minishroud_length / 2 - MINISHROUD_END_THICKNESS],
+        [x_pos, y_pos, z_nms],
         nms,
         nms.name + "_string_" + string_id,
         mothervolume,
@@ -252,15 +256,23 @@ def _place_hpge_string(
     )
 
     # TODO: add back support structure that now overlaps with NMS.
-    # support = _get_support_structure(materials, registry)
-    # geant4.PhysicalVolume(
-    #    [0, 0, np.deg2rad(30) + string_rot],
-    #    [x_pos, y_pos, z0_string + 12],  # this offset of 12 is measured from the CAD file.
-    #    support,
-    #    support.name + "_string_" + string_id,
-    #    mothervolume,
-    #    registry,
-    # )
+    support, tristar = _get_support_structure(string_slots[1].baseplate, materials, registry)
+    geant4.PhysicalVolume(
+        [0, 0, np.deg2rad(30) + string_rot],
+        [x_pos, y_pos, z0_string + 12],  # this offset of 12 is measured from the CAD file.
+        support,
+        support.name + "_string_" + string_id,
+        mothervolume,
+        registry,
+    )
+    geant4.PhysicalVolume(
+        [0, 0, string_rot],
+        [x_pos, y_pos, z0_string + 12 - 1e-6],  # this offset of 12 is measured from the CAD file.
+        tristar,
+        tristar.name + "_string_" + string_id,
+        mothervolume,
+        registry,
+    )
 
     copper_rod_r = string_meta.rod_radius_in_mm
     assert copper_rod_r < string_meta.minishroud_radius_in_mm - 0.75
@@ -274,7 +286,7 @@ def _place_hpge_string(
         delta = copper_rod_r * string_rot_m @ np.array([np.cos(copper_rod_th), np.sin(copper_rod_th)])
         geant4.PhysicalVolume(
             [0, 0, 0],
-            [x_pos + delta[0], y_pos + delta[1], z0_string - copper_rod_length / 2],
+            [x_pos + delta[0], y_pos + delta[1], z0_string + 12 - copper_rod_length / 2],
             copper_rod,
             f"{copper_rod_name}_{i}",
             mothervolume,
@@ -283,6 +295,7 @@ def _place_hpge_string(
 
 
 _pen_plate_cache = {}
+_tristar_cache = {}
 _minishroud_cache = {}
 # Those dimensions are from an email from A. Lubashevskiy to L. Varriano on Dec 12, 2023; on the NMS made at
 # TUM in May 2022.
@@ -326,9 +339,10 @@ def _get_pen_plate(
 
 
 def _get_support_structure(
+    size: str,
     materials: materials.OpticalMaterialRegistry,
     registry: geant4.Registry,
-) -> geant4.LogicalVolume:
+) -> tuple[geant4.LogicalVolume, geant4.LogicalVolume]:
     """This model's origin is a the top face of the tripod structure."""
     if "string_support_structure" not in registry.solidDict:
         support_file = resources.files("l200geom") / "models" / "StringSupportStructure.stl"
@@ -343,7 +357,16 @@ def _get_support_structure(
         support_solid = registry.solidDict["string_support_structure"]
         support_lv = registry.logicalVolumeDict["string_support_structure"]
 
-    return support_lv
+    if size not in _tristar_cache:
+        pen_file = resources.files("l200geom") / "models" / f"TriStar_{size}.stl"
+
+        pen_solid = pyg4ometry.stl.Reader(
+            pen_file, solidname=f"tristar_{size}", centre=False, registry=registry
+        ).getSolid()
+        _tristar_cache[size] = geant4.LogicalVolume(pen_solid, materials.pen, f"tristar_{size}", registry)
+        _tristar_cache[size].pygeom_color_rgba = (0.72, 0.45, 0.2, 1)
+
+    return support_lv, _tristar_cache[size]
 
 
 def _get_nylon_mini_shroud(
