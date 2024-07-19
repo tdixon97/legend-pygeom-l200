@@ -8,6 +8,8 @@
   - `angle_in_deg` → azimutal position of the string with respect to the
     positive x-direction
   - `minishroud_radius_in_mm` → radius of the minishroud of this string
+  - `minishroud_delta_length_in_mm` → modification of the default length of a
+    NMS. If unspecified, 0 will be used.
   - `rod_radius_in_mm` → placement radius of the support rod of this string
 
 ## HPGe detector unit configuration
