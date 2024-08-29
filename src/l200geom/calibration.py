@@ -33,14 +33,14 @@ def place_calibration_system(
         raise ValueError(msg)
 
     # place calibration tubes.
-    # note: the length is just a rough guess from MaGe, the radius is from the CAD model.
+    # note: the length is just a rough guess from MaGe, the radius is from slides of A. Lubashevskiy.
     calib_tube_length = 1400
-    calib_tube = hpge_strings._get_nylon_mini_shroud(18.25, calib_tube_length, True, materials, registry)
+    calib_tube = hpge_strings._get_nylon_mini_shroud(19, calib_tube_length, True, materials, registry)
     calib_tube_z = z0 - calib_tube_length / 2
 
     # all positions from CAD model.
     calib_tube_r = 155  # mm
-    calib_tube_phi = np.deg2rad(np.array([338.57, 261.43, 158.57, 81.43]))
+    calib_tube_phi = np.deg2rad(np.array([158.57, 261.43, 338.57, 81.43]))
     calib_tube_xy = np.array([calib_tube_r * np.cos(calib_tube_phi), -calib_tube_r * np.sin(calib_tube_phi)])
     for i in range(4):
         geant4.PhysicalVolume(
