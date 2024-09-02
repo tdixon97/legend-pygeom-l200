@@ -332,6 +332,28 @@ class ModuleFactoryBase(ABC):
             self.registry,
         )
 
+    def _add_tpb_surfaces(
+        self,
+        fiber_pvs: list[g4.PhysicalVolume],
+        mother_pv: g4.LogicalVolume,
+    ):
+        # between LAr and PEN we need a surface in both directions.
+        for tpb_pv in fiber_pvs:
+            g4.BorderSurface(
+                "bsurface_lar_tpb_" + tpb_pv.name,
+                mother_pv,
+                tpb_pv,
+                self.materials.surfaces.lar_to_tpb,
+                self.registry,
+            )
+            g4.BorderSurface(
+                "bsurface_tpb_lar_" + tpb_pv.name,
+                tpb_pv,
+                mother_pv,
+                self.materials.surfaces.lar_to_tpb,
+                self.registry,
+            )
+
 
 class ModuleFactorySingleFibers(ModuleFactoryBase):
     # for bent detailed fibers, the fibers would overlap a lot near the bottom SiPMs. To avoid
@@ -659,6 +681,8 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
                     self.registry,
                 )
 
+        self._add_tpb_surfaces(fibers, mother_pv)
+
         # create SiPMs and attach to fibers
         self._create_sipm(
             module_num,
@@ -982,6 +1006,8 @@ class ModuleFactorySegment(ModuleFactoryBase):
                     self.registry,
                 )
             )
+
+        self._add_tpb_surfaces(fibers, mother_pv)
 
         # create SiPMs and attach to fibers
         self._create_sipm(

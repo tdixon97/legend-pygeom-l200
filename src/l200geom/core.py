@@ -50,7 +50,7 @@ def construct(
             reg,
         )
         wlsr_pvs = wlsr.place_wlsr(*wlsr_lvs, lar_lv, 3 * 180, reg)
-        wlsr.add_surfaces_wlsr(*wlsr_pvs[1:], lar_lv, mats, reg)
+        wlsr.add_surfaces_wlsr(*wlsr_pvs[1:], lar_pv, mats, reg)
 
     channelmap = lmeta.channelmap("20230311T235840Z")
 
@@ -61,11 +61,13 @@ def construct(
     top_plate_z_pos = 1700
 
     if "strings" in assemblies:
-        hpge_strings.place_hpge_strings(channelmap, hpge_string_config, top_plate_z_pos, lar_lv, mats, reg)
+        hpge_strings.place_hpge_strings(
+            channelmap, hpge_string_config, top_plate_z_pos, lar_lv, lar_pv, mats, reg
+        )
     if "calibration" in assemblies:
         calibration.place_calibration_system(top_plate_z_pos, lar_lv, mats, reg)
     if "top" in assemblies:
-        top.place_top_plate(top_plate_z_pos, lar_lv, mats, reg)
+        top.place_top_plate(top_plate_z_pos, lar_lv, lar_pv, mats, reg)
 
     # build fiber modules
     if "fibers" in assemblies:
@@ -74,4 +76,27 @@ def construct(
             fiber_modules, channelmap, top_plate_z_pos, lar_lv, lar_pv, mats, reg, use_detailed_fiber_model
         )
 
+    _assign_common_copper_surface(lar_lv, lar_pv, mats, reg)
+
     return reg
+
+
+def _assign_common_copper_surface(
+    mother_lv: geant4.LogicalVolume,
+    mother_pv: geant4.PhysicalVolume,
+    materials: materials.OpticalMaterialRegistry,
+    reg: geant4.Registry,
+) -> None:
+    if hasattr(materials, "_metal_copper") is None:
+        return
+    surf = None
+    cu_mat = materials.metal_copper
+
+    for _, pv in reg.physicalVolumeDict.items():
+        if pv.motherVolume != mother_lv or pv.logicalVolume.material != cu_mat:
+            continue
+        if surf is None:
+            surf = materials.surfaces.to_copper
+
+        geant4.BorderSurface("bsurface_lar_cu_" + pv.name, mother_pv, pv, surf, reg)
+        geant4.BorderSurface("bsurface_cu_lar_" + pv.name, pv, mother_pv, surf, reg)

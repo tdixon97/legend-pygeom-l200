@@ -12,7 +12,8 @@ log = logging.getLogger(__name__)
 
 def place_calibration_system(
     z0: float,
-    mothervolume: geant4.LogicalVolume,
+    mother_lv: geant4.LogicalVolume,
+    mother_pv: geant4.PhysicalVolume,
     materials: materials.OpticalMaterialRegistry,
     registry: geant4.Registry,
 ) -> None:
@@ -22,7 +23,7 @@ def place_calibration_system(
     ----------
     z0
         The z coordinate of the top face of the array top plate.
-    mothervolume
+    mother_lv
         pyg4ometry Geant4 LogicalVolume instance in which the strings
         are to be placed.
     registry
@@ -42,12 +43,13 @@ def place_calibration_system(
     calib_tube_r = 155  # mm
     calib_tube_phi = np.deg2rad(np.array([158.57, 261.43, 338.57, 81.43]))
     calib_tube_xy = np.array([calib_tube_r * np.cos(calib_tube_phi), -calib_tube_r * np.sin(calib_tube_phi)])
-    for i in range(4):
-        geant4.PhysicalVolume(
+    for i in range(calib_tube_phi.shape[0]):
+        nms_pv = geant4.PhysicalVolume(
             [0, 0, 0],
             [*calib_tube_xy[:, i], calib_tube_z],
             calib_tube,
             f"calibration_tube_{i+1}",
-            mothervolume,
+            mother_lv,
             registry,
         )
+        hpge_strings._add_nms_surfaces(nms_pv, mother_pv, materials, registry)

@@ -85,7 +85,7 @@ def place_wlsr(
 def add_surfaces_wlsr(
     wlsr_ttx_pv: g4.PhysicalVolume,
     wlsr_tpb_pv: g4.PhysicalVolume,
-    mother_pv: g4.LogicalVolume,
+    mother_pv: g4.PhysicalVolume,
     mats: materials.OpticalMaterialRegistry,
     reg: g4.Registry,
 ):
@@ -93,6 +93,5 @@ def add_surfaces_wlsr(
     g4.BorderSurface("bsurface_tpb_ttx", wlsr_tpb_pv, wlsr_ttx_pv, mats.surfaces.wlsr_tpb_to_tetratex, reg)
 
     # between LAr and TPB we need a surface in both directions.
-    # TODO: do we need those?
-    # g4.BorderSurface("bsurface_wlsr_tpb_lar", mother_pv, wlsr_tpb_pv, mats.surface_lar2tpb, reg)
-    # g4.BorderSurface("bsurface_wlsr_lar_tpb", wlsr_tpb_pv, mother_pv, mats.surface_lar2tpb, reg)
+    g4.BorderSurface("bsurface_wlsr_tpb_lar", mother_pv, wlsr_tpb_pv, mats.surfaces.lar_to_tpb, reg)
+    g4.BorderSurface("bsurface_wlsr_lar_tpb", wlsr_tpb_pv, mother_pv, mats.surfaces.lar_to_tpb, reg)

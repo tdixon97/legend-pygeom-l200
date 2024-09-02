@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import legendoptics.copper
+import legendoptics.germanium
 import legendoptics.silicon
 import legendoptics.tetratex
 import numpy as np
@@ -22,17 +23,23 @@ class OpticalSurfaceRegistry:
         `value` is the `sigma_alpha` parameter, the stddev of the newly chosen facet normal direction.
         For details on this model and its parameters, see `UNIFIED model diagram`_.
     * GLISUR model:
-        `value` as smoothness, in range [0,1]
+        `value` as smoothness, in range [0,1] (0=rough, 1=perfectly smooth).
+
+    UNIFIED is more comprehensive, but is not directly equivalent to GLISUR. One notable difference is
+    that UNIFIED/ground surfaces w/o specular probabilities set will not perform total internal reflection
+    according to alpha1=alpha2, whereas GFLISUR/ground will do! Polished surfaces should behave similar
+    between UNIFIED and GLISUR.
 
     .. _UNIFIED model diagram: https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/_images/UNIFIED_model_diagram.png
     """
 
     def __init__(self, reg: g4.Registry):
         self.g4_registry = reg
+        # do not change the surface model w/o also changing all surface values below!
         self._model = "unified"
 
     @property
-    def to_copper(self) -> g4.Material:
+    def to_copper(self) -> g4.solid.OpticalSurface:
         """Reflective surface for copper structure."""
         if hasattr(self, "_to_copper"):
             return self._to_copper
@@ -42,7 +49,7 @@ class OpticalSurfaceRegistry:
             finish="ground",
             model=self._model,
             surf_type="dielectric_metal",
-            value=0.9,
+            value=0.5,  # rad. converted from 0.5, probably a GLISUR smoothness parameter, in MaGe.
             registry=self.g4_registry,
         )
 
@@ -54,17 +61,39 @@ class OpticalSurfaceRegistry:
         return self._to_copper
 
     @property
-    def wlsr_tpb_to_tetratex(self) -> g4.Material:
+    def to_germanium(self) -> g4.solid.OpticalSurface:
+        """Reflective surface for germanium detectors."""
+        if hasattr(self, "_to_germanium"):
+            return self._to_germanium
+
+        self._to_copper = g4.solid.OpticalSurface(
+            "surface_to_germanium",
+            finish="ground",
+            model=self._model,
+            surf_type="dielectric_metal",
+            value=0.3,  # rad. converted from 0.5, probably a GLISUR smoothness parameter, in MaGe.
+            registry=self.g4_registry,
+        )
+
+        legendoptics.germanium.pyg4_germanium_attach_reflectivity(
+            self._to_germanium,
+            self.g4_registry,
+        )
+
+        return self._to_germanium
+
+    @property
+    def wlsr_tpb_to_tetratex(self) -> g4.solid.OpticalSurface:
         """Reflective surface Tetratex diffuse reflector."""
         if hasattr(self, "_wlsr_tpb_to_tetratex"):
             return self._wlsr_tpb_to_tetratex
 
         self._wlsr_tpb_to_tetratex = g4.solid.OpticalSurface(
             "surface_wlsr_tpb_to_tetratex",
-            finish="groundfrontpainted",
+            finish="groundfrontpainted",  # only lambertian reflection
             model=self._model,
             surf_type="dielectric_dielectric",
-            value=0.9,
+            value=0,  # rad. perfectly lambertian reflector.
             registry=self.g4_registry,
         )
 
@@ -76,7 +105,7 @@ class OpticalSurfaceRegistry:
         return self._wlsr_tpb_to_tetratex
 
     @property
-    def to_sipm_silicon(self) -> g4.Material:
+    def to_sipm_silicon(self) -> g4.solid.OpticalSurface:
         """Reflective surface for KETEK SiPM."""
         if hasattr(self, "_to_sipm_silicon"):
             return self._to_sipm_silicon
@@ -86,7 +115,7 @@ class OpticalSurfaceRegistry:
             finish="ground",
             model=self._model,
             surf_type="dielectric_metal",
-            value=0.9,
+            value=0.05,  # converted from 0.9, probably a GLISUR smoothness parameter, in MaGe.
             registry=self.g4_registry,
         )
 
@@ -102,3 +131,42 @@ class OpticalSurfaceRegistry:
             self._to_sipm_silicon.addVecPropertyPint("EFFICIENCY", λ.to("eV"), eff)
 
         return self._to_sipm_silicon
+
+    @property
+    def lar_to_tpb(self) -> g4.solid.OpticalSurface:
+        """Optical surface between LAr and TBP wavelength shifting coating."""
+        if hasattr(self, "_lar_to_tpb"):
+            return self._lar_to_tpb
+
+        self._lar_to_tpb = g4.solid.OpticalSurface(
+            "surface_lar_to_tpb",
+            finish="ground",
+            model="unified",
+            surf_type="dielectric_dielectric",
+            value=0.3,  # rad. converted from 0.5, probably a GLISUR smoothness parameter, in MaGe.
+            registry=self.g4_registry,
+        )
+
+        return self._lar_to_tpb
+
+    @property
+    def lar_to_pen(self) -> g4.solid.OpticalSurface:
+        """Optical surface between LAr and PEN scintillator/wavelength shifting coating."""
+        if hasattr(self, "_lar_to_pen"):
+            return self._lar_to_pen
+
+        self._lar_to_pen = g4.solid.OpticalSurface(
+            "surface_lar_to_pen",
+            finish="ground",
+            model="unified",
+            surf_type="dielectric_dielectric",
+            # sigma_alpha corresponds to the value from L. Manzanillas et al 2022 JINST 17 P09007.
+            value=0.01,  # rad.
+            registry=self.g4_registry,
+        )
+
+        # TODO: we do not have reflectivity of PEN in the optics package?
+        # also we don't have the necessary specular lobe/spike probabilities set. UNIFIED will not behave as intended...
+        # MaGe has specularlobe=0.4, specularspike=0.6; but commented out
+
+        return self._lar_to_pen
