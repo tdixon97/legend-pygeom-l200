@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from importlib import resources
+from typing import NamedTuple
 
-from legendmeta import LegendMetadata, TextDB
+from legendmeta import AttrsDict, LegendMetadata, TextDB
 from pyg4ometry import geant4
 
 from . import calibration, cryo, fibers, hpge_strings, materials, top, wlsr
@@ -11,6 +12,27 @@ lmeta = LegendMetadata()
 configs = TextDB(resources.files("l200geom") / "configs")
 
 DEFINED_ASSEMBLIES = ["wlsr", "strings", "calibration", "fibers", "top"]
+
+
+class InstrumentationData(NamedTuple):
+    mother_lv: geant4.LogicalVolume
+    """LogicalVolume instance in which all components are to be placed."""
+    mother_pv: geant4.PhysicalVolume
+    """PhysicalVolume instance in which all components are to be placed."""
+    materials: materials.OpticalMaterialRegistry
+    """Material properties for common materials"""
+    registry: geant4.Registry
+    """pyg4ometry registry instance."""
+
+    channelmap: AttrsDict
+    """LEGEND-200 channel map containing germanium/spms detectors configuration in the string
+    and their geometry."""
+    special_metadata: AttrsDict
+    """LEGEND-200 germanium detector string configuration file. Used to reconstruct the spatial
+    position of each string."""
+
+    top_plate_z_pos: float
+    """The z coordinate of the top face of the array top plate."""
 
 
 def construct(
@@ -41,6 +63,13 @@ def construct(
     lar_lv = cryo.construct_argon(mats.liquidargon, reg)
     lar_pv = cryo.place_argon(lar_lv, cryostat_lv, coordinate_z_displacement, reg)
 
+    # top of the top plate, this is still a dummy value!
+    top_plate_z_pos = 1700
+
+    channelmap = lmeta.channelmap("20230311T235840Z")
+    special_metadata = configs.on("20230311T235840Z")
+    instr = InstrumentationData(lar_lv, lar_pv, mats, reg, channelmap, special_metadata, top_plate_z_pos)
+
     if "wlsr" in assemblies:
         # Place the WLSR into the cryostat.
         wlsr_lvs = wlsr.construct_wlsr(
@@ -50,53 +79,34 @@ def construct(
             reg,
         )
         wlsr_pvs = wlsr.place_wlsr(*wlsr_lvs, lar_lv, 3 * 180, reg)
-        wlsr.add_surfaces_wlsr(*wlsr_pvs[1:], lar_pv, mats, reg)
+        wlsr.add_surfaces_wlsr(*wlsr_pvs[1:], instr)
 
-    channelmap = lmeta.channelmap("20230311T235840Z")
-
-    # Place the germanium detector array inside the liquid argon
-    hpge_string_config = configs.on("20230311T235840Z")
-
-    # top of the top plate, this is still a dummy value!
-    top_plate_z_pos = 1700
-
+    # Place all other instrumentation into the liquid argon
     if "strings" in assemblies:
-        hpge_strings.place_hpge_strings(
-            channelmap, hpge_string_config, top_plate_z_pos, lar_lv, lar_pv, mats, reg
-        )
+        hpge_strings.place_hpge_strings(instr)
     if "calibration" in assemblies:
-        calibration.place_calibration_system(top_plate_z_pos, lar_lv, mats, reg)
+        calibration.place_calibration_system(instr)
     if "top" in assemblies:
-        top.place_top_plate(top_plate_z_pos, lar_lv, lar_pv, mats, reg)
-
-    # build fiber modules
+        top.place_top_plate(instr)
     if "fibers" in assemblies:
-        fiber_modules = lmeta.hardware.detectors.lar.fibers
-        fibers.place_fiber_modules(
-            fiber_modules, channelmap, top_plate_z_pos, lar_lv, lar_pv, mats, reg, use_detailed_fiber_model
-        )
+        fibers.place_fiber_modules(lmeta.hardware.detectors.lar.fibers, instr, use_detailed_fiber_model)
 
-    _assign_common_copper_surface(lar_lv, lar_pv, mats, reg)
+    _assign_common_copper_surface(instr)
 
     return reg
 
 
-def _assign_common_copper_surface(
-    mother_lv: geant4.LogicalVolume,
-    mother_pv: geant4.PhysicalVolume,
-    materials: materials.OpticalMaterialRegistry,
-    reg: geant4.Registry,
-) -> None:
-    if hasattr(materials, "_metal_copper") is None:
+def _assign_common_copper_surface(b: InstrumentationData) -> None:
+    if hasattr(b.materials, "_metal_copper") is None:
         return
     surf = None
-    cu_mat = materials.metal_copper
+    cu_mat = b.materials.metal_copper
 
-    for _, pv in reg.physicalVolumeDict.items():
-        if pv.motherVolume != mother_lv or pv.logicalVolume.material != cu_mat:
+    for _, pv in b.registry.physicalVolumeDict.items():
+        if pv.motherVolume != b.mother_lv or pv.logicalVolume.material != cu_mat:
             continue
         if surf is None:
-            surf = materials.surfaces.to_copper
+            surf = b.materials.surfaces.to_copper
 
-        geant4.BorderSurface("bsurface_lar_cu_" + pv.name, mother_pv, pv, surf, reg)
-        geant4.BorderSurface("bsurface_cu_lar_" + pv.name, pv, mother_pv, surf, reg)
+        geant4.BorderSurface("bsurface_lar_cu_" + pv.name, b.mother_pv, pv, surf, b.registry)
+        geant4.BorderSurface("bsurface_cu_lar_" + pv.name, pv, b.mother_pv, surf, b.registry)
