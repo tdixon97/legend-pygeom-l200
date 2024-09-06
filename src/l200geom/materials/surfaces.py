@@ -165,8 +165,16 @@ class OpticalSurfaceRegistry:
             registry=self.g4_registry,
         )
 
-        # TODO: we do not have reflectivity of PEN in the optics package?
-        # also we don't have the necessary specular lobe/spike probabilities set. UNIFIED will not behave as intended...
-        # MaGe has specularlobe=0.4, specularspike=0.6; but commented out
+        # set specular spike/lobe probabilities. From a presentation by L. Manzanillas ("Update on PEN optical
+        # parameters for Geant4 studies", 29.04.2021); slide 12 "Recommended data for PEN simulations", both are 0.5.
+        # note: MaGe has specularlobe=0.4, specularspike=0.6; but commented out. Luis' last code uses the same values
+        # as MaGe:
+        # https://github.com/lmanzanillas/AttenuationPenSetup/blob/11ff9664e3b2da3c0ebf726b60ad96111e9b2aaa/src/DetectorConstruction.cc#L1771-L1786
+        λ = np.array([650.0, 115.0]) * u.nm
+        specular_lobe = np.array([0.4, 0.4])
+        specular_spike = np.array([0.6, 0.6])
+        with u.context("sp"):
+            self._lar_to_pen.addVecPropertyPint("SPECULARSPIKECONSTANT", λ.to("eV"), specular_spike)
+            self._lar_to_pen.addVecPropertyPint("SPECULARLOBECONSTANT", λ.to("eV"), specular_lobe)
 
         return self._lar_to_pen
