@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from importlib import resources
-from typing import NamedTuple
+from typing import Callable, NamedTuple
 
 from legendmeta import AttrsDict, LegendMetadata, TextDB
 from pyg4ometry import geant4
@@ -28,8 +28,10 @@ class InstrumentationData(NamedTuple):
     """LEGEND-200 channel map containing germanium/spms detectors configuration in the string
     and their geometry."""
     special_metadata: AttrsDict
-    """LEGEND-200 germanium detector string configuration file. Used to reconstruct the spatial
-    position of each string."""
+    """LEGEND-200 special geometry metadata file. Used to reconstruct the spatial position of each
+    string, detector and calibration tube."""
+    runtime_config: AttrsDict
+    """Volatile runtime config, settings that are not tied to a specific detector configuration."""
 
     top_plate_z_pos: float
     """The z coordinate of the top face of the array top plate."""
@@ -38,11 +40,14 @@ class InstrumentationData(NamedTuple):
 def construct(
     assemblies: list[str] = DEFINED_ASSEMBLIES,
     use_detailed_fiber_model: bool = False,
+    config: dict | None = None,
 ) -> geant4.Registry:
     """Construct the LEGEND-200 geometry and return the pyg4ometry Registry containing the world volume."""
     if set(assemblies) - set(DEFINED_ASSEMBLIES) != set():
         msg = "invalid geometrical assembly specified"
         raise ValueError(msg)
+
+    config = config if config is not None else {}
 
     reg = geant4.Registry()
     mats = materials.OpticalMaterialRegistry(reg)
@@ -66,9 +71,12 @@ def construct(
     # top of the top plate, this is still a dummy value!
     top_plate_z_pos = 1700
 
-    channelmap = lmeta.channelmap("20230311T235840Z")
-    special_metadata = configs.on("20230311T235840Z")
-    instr = InstrumentationData(lar_lv, lar_pv, mats, reg, channelmap, special_metadata, top_plate_z_pos)
+    timestamp = config.get("metadata_timestamp", "20230311T235840Z")
+    channelmap = _load_map_from_config(config, "channelmap", lambda: lmeta.channelmap(timestamp))
+    special_metadata = _load_map_from_config(config, "special_metadata", lambda: configs.on(timestamp))
+    instr = InstrumentationData(
+        lar_lv, lar_pv, mats, reg, channelmap, special_metadata, AttrsDict(config), top_plate_z_pos
+    )
 
     if "wlsr" in assemblies:
         # Place the WLSR into the cryostat.
@@ -78,6 +86,7 @@ def construct(
             mats.tpb_on_tetratex,
             reg,
         )
+        # TODO: the z offset here is still a dummy value?
         wlsr_pvs = wlsr.place_wlsr(*wlsr_lvs, lar_lv, 3 * 180, reg)
         wlsr.add_surfaces_wlsr(*wlsr_pvs[1:], instr)
 
@@ -94,6 +103,19 @@ def construct(
     _assign_common_copper_surface(instr)
 
     return reg
+
+
+def _load_map_from_config(config: dict, key: str, default: Callable[[], AttrsDict]) -> AttrsDict:
+    m = config.get(key)
+    if isinstance(m, str):
+        import json
+        from pathlib import Path
+
+        with Path(m).open() as jfile:
+            return AttrsDict(json.load(jfile))
+    elif isinstance(m, dict):
+        return AttrsDict(m)
+    return default()
 
 
 def _assign_common_copper_surface(b: InstrumentationData) -> None:
