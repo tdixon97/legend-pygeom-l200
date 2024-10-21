@@ -95,7 +95,6 @@ def construct(
         hpge_strings.place_hpge_strings(instr)
     if "calibration" in assemblies:
         calibration.place_calibration_system(instr)
-        # calibration.place_ta_absorber(1700 - 750, lar_lv, mats, reg)
     if "top" in assemblies:
         top.place_top_plate(instr)
     if "fibers" in assemblies:

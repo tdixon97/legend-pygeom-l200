@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 import math
+from typing import Literal
 
 import numpy as np
 from pyg4ometry import geant4
 
-from . import core, hpge_strings, materials
-
+from . import core, hpge_strings
 
 log = logging.getLogger(__name__)
 
@@ -46,86 +46,97 @@ def place_calibration_system(b: core.InstrumentationData) -> None:
         calib_tube_length[0] if all(length == calib_tube_length[0] for length in calib_tube_length) else None
     )
 
+    # place the actual calibration sources inside.
+    if not hasattr(b.runtime_config, "sis"):
+        return
+    sis_cfg = b.runtime_config.sis
+    for i, _ in b.special_metadata.calibration.items():
+        if i not in sis_cfg or sis_cfg[i] is None:
+            continue
+        idx = int(i) - 1
+        pin_top = _sis_to_pygeoml200(sis_cfg[i].sis_z)  # SIS reading to our coordinates.
 
-def place_ta_absorber(
-    z0: float,
-    mothervolume: geant4.LogicalVolume,
-    materials: materials.OpticalMaterialRegistry,
-    registry: geant4.Registry,
+        if len(sis_cfg[i].sources) != 4:
+            msg = f"Invalid number of sources in config of SIS{i}"
+            raise ValueError(msg)
+        if any(s is not None for s in sis_cfg[i].sources[0:3]):
+            # TODO: implement source slots 1-3 and remove this check.
+            msg = "Setting a source not in the lowest slot is not supported at the moment"
+            raise NotImplementedError(msg)
+
+        if sis_cfg[i].sources[3] is not None:
+            source_spec = _parse_source_spec(sis_cfg[i].sources[3])
+            _place_ta_absorber_with_source(
+                b,
+                f"sis{i}_source4",
+                calib_tube_xy[:, idx],
+                pin_top + 42,
+                source_type=source_spec["type"],
+                cu_absorber=source_spec["has_cu"],
+            )
+
+
+ABSORBER_HEIGHT = 37.5
+source_height = 17.6  # mm
+source_outside = 10.6  # mm
+source_inside = source_height - source_outside
+source_radius = 6.4 / 2
+
+cu_aborber_thickness = 2.5  # mm
+cu_absorber_height = 15 - 0.01  # mm, drawing from S. Schönert
+cu_absorber_inner_height = 12.5
+
+
+def _place_ta_absorber_with_source(
+    b: core.InstrumentationData,
+    prefix: str,
+    xy,
+    delta_z: float,
+    source_type: Literal["Th228", "Ra"],
+    cu_absorber: bool,
 ) -> None:
-    """Construct LEGEND-200 HPGe strings.
+    """Place tantalum absorber plus source container.
 
-    Parameters
-    ----------
-    z0
-        The position of the top most slot of the strings in the z-axis.
-    mothervolume
-        pyg4ometry Geant4 LogicalVolume instance in which the strings
-        are to be placed.
-    registry
-        pyg4ometry Geant4 registry instance.
+    delta_z
+        to absorber top from top plate top
     """
-    if registry is None:
-        msg = "registry cannot be None"
-        raise ValueError(msg)
-
-    xy = (-118.4352, 93.870075)  # to fix overlaps, not the physical position.
-
-    source_height = 17.6  # mm
-    source_outside = 10.6  # mm
-    source_inside = source_height - source_outside
-    source_radius = 6.4 / 2
-    absorber_height = 37.5
-    ta_absorber_outer = geant4.solid.Tubs(
-        "ta_absorber_outer",
-        0,
-        16.2,  # estimate!
-        absorber_height,
-        0,
-        2 * math.pi,
-        registry,
-    )
-    ta_absorber_inner = geant4.solid.Tubs(
-        "ta_absorber_inner", 0, source_radius, source_height - source_outside, 0, 2 * math.pi, registry
-    )
-    ta_absorber = geant4.solid.Subtraction(
-        "ta_absorber",
-        ta_absorber_outer,
-        ta_absorber_inner,
-        [[0, 0, 0], [0, 0, (absorber_height - source_inside) / 2]],
-        registry,
-    )
-    ta_absorber_lv = geant4.LogicalVolume(ta_absorber, materials.metal_tantalum, "ta_absorber", registry)
+    z0 = b.top_plate_z_pos - delta_z - ABSORBER_HEIGHT / 2
 
     # all positions from MaGe, might be incorrect!
+    ta_absorber_lv = _get_ta_absorber(b)
     geant4.PhysicalVolume(
         [0, 0, 0],
         [*xy, z0],
         ta_absorber_lv,
         "ta_absorber_3",
-        mothervolume,
-        registry,
+        b.mother_lv,
+        b.registry,
     )
 
     source_outer = geant4.solid.Tubs(
-        "source_outer", 0, source_radius, source_height, 0, 2 * math.pi, registry
+        "source_outer", 0, source_radius, source_height, 0, 2 * math.pi, b.registry
     )
-    source_outer = geant4.LogicalVolume(source_outer, materials.metal_steel, "source_outer", registry)
-    source_z = z0 + absorber_height / 2 + source_height / 2 - source_inside
+    source_outer = geant4.LogicalVolume(source_outer, b.materials.metal_steel, "source_outer", b.registry)
+    source_z = z0 + ABSORBER_HEIGHT / 2 + source_height / 2 - source_inside
     geant4.PhysicalVolume(
         [0, 0, 0],
         [*xy, source_z],
         source_outer,
         "source_outer",
-        mothervolume,
-        registry,
+        b.mother_lv,
+        b.registry,
     )
-    source_inner = geant4.solid.Tubs("source_inner", 0, 2, 4, 0, 2 * math.pi, registry)
+    source_inner = geant4.solid.Tubs("source_inner", 0, 2, 4, 0, 2 * math.pi, b.registry)
 
-    # source_material = materials.metal_caps_gold
-    source_material = geant4.MaterialPredefined("G4_SILICON_DIOXIDE")
+    if source_type == "Th228":
+        source_material = b.materials.metal_caps_gold  # for Th source
+    elif source_type == "Ra":
+        source_material = geant4.MaterialPredefined("G4_SILICON_DIOXIDE")  # for Ra source
+    else:
+        msg = f"unknown source type {source_type}"
+        raise ValueError(msg)
 
-    source_inner = geant4.LogicalVolume(source_inner, source_material, "source_inner", registry)
+    source_inner = geant4.LogicalVolume(source_inner, source_material, "source_inner", b.registry)
     source_inner.pygeom_color_rgba = (1, 1, 0, 1)
     source_inner_z = source_height / 2 - 4 / 2 - 1.2
     geant4.PhysicalVolume(
@@ -134,81 +145,124 @@ def place_ta_absorber(
         source_inner,
         "source_inner",
         source_outer,
-        registry,
+        b.registry,
     )
 
-    cu_aborber_thickness = 2.5  # mm
-    cu_absorber_height = 15 - 0.01  # mm, drawing from S. Schönert
-    cu_absorber_inner_height = 12.5
-    cu_absorber_outer = geant4.solid.Tubs(
-        "cu_absorber_outer",
-        0,
-        (14 - 0.01) / 2,  # Drawing from S. Schönert
-        cu_absorber_height,
-        0,
-        2 * math.pi,
-        registry,
-    )
-    cu_absorber_inner = geant4.solid.Tubs(
-        "cu_absorber_inner", 0, 7.6 / 2, cu_absorber_inner_height, 0, 2 * math.pi, registry
-    )
-    cu_absorber = geant4.solid.Subtraction(
-        "cu_absorber",
-        cu_absorber_outer,
-        cu_absorber_inner,
-        [[0, 0, 0], [0, 0, -(cu_absorber_height - cu_absorber_inner_height) / 2]],
-        registry,
-    )
-    cu_absorber = geant4.LogicalVolume(cu_absorber, materials.metal_copper, "cu_absorber", registry)
-    cu_absorber.pygeom_color_rgba = (0.72, 0.45, 0.2, 0.3)
-    cu_absorber_z = z0 + absorber_height / 2 + cu_absorber_height / 2
+    if cu_absorber:
+        cu_absorber_outer = geant4.solid.Tubs(
+            "cu_absorber_outer",
+            0,
+            (14 - 0.01) / 2,  # Drawing from S. Schönert
+            cu_absorber_height,
+            0,
+            2 * math.pi,
+            b.registry,
+        )
+        cu_absorber_inner = geant4.solid.Tubs(
+            "cu_absorber_inner", 0, 7.6 / 2, cu_absorber_inner_height, 0, 2 * math.pi, b.registry
+        )
+        cu_absorber = geant4.solid.Subtraction(
+            "cu_absorber",
+            cu_absorber_outer,
+            cu_absorber_inner,
+            [[0, 0, 0], [0, 0, -(cu_absorber_height - cu_absorber_inner_height) / 2]],
+            b.registry,
+        )
+        cu_absorber = geant4.LogicalVolume(cu_absorber, b.materials.metal_copper, "cu_absorber", b.registry)
+        cu_absorber.pygeom_color_rgba = (0.72, 0.45, 0.2, 0.3)
+        cu_absorber_z = z0 + ABSORBER_HEIGHT / 2 + cu_absorber_height / 2
 
-    cu_absorber_lar_inner = geant4.solid.Tubs(
-        "cu_absorber_lar_inactive_inner", 0, source_radius, source_outside, 0, 2 * math.pi, registry
-    )
-    cu_absorber_lar = geant4.solid.Subtraction(
-        "cu_absorber_lar_inactive",
-        cu_absorber_inner,
-        cu_absorber_lar_inner,
-        [[0, 0, 0], [0, 0, -(cu_absorber_inner_height - source_outside) / 2]],
-        registry,
-    )
-    cu_absorber_lar = geant4.LogicalVolume(
-        cu_absorber_lar, materials.liquidargon, "cu_absorber_lar_inactive", registry
-    )
-    cu_absorber_lar.pygeom_color_rgba = (1, 1, 1, 0.0001)
-    cu_absorber_lar_z = z0 + absorber_height / 2 + cu_absorber_inner_height / 2
-    if True:
+        cu_absorber_lar_inner = geant4.solid.Tubs(
+            "cu_absorber_lar_inactive_inner", 0, source_radius, source_outside, 0, 2 * math.pi, b.registry
+        )
+        cu_absorber_lar = geant4.solid.Subtraction(
+            "cu_absorber_lar_inactive",
+            cu_absorber_inner,
+            cu_absorber_lar_inner,
+            [[0, 0, 0], [0, 0, -(cu_absorber_inner_height - source_outside) / 2]],
+            b.registry,
+        )
+        cu_absorber_lar = geant4.LogicalVolume(
+            cu_absorber_lar, b.materials.liquidargon, "cu_absorber_lar_inactive", b.registry
+        )
+        cu_absorber_lar.pygeom_color_rgba = (1, 1, 1, 0.0001)
+        cu_absorber_lar_z = z0 + ABSORBER_HEIGHT / 2 + cu_absorber_inner_height / 2
         geant4.PhysicalVolume(
             [0, 0, 0],
             [*xy, cu_absorber_z],
             cu_absorber,
             "cu_absorber",
-            mothervolume,
-            registry,
+            b.mother_lv,
+            b.registry,
         )
         geant4.PhysicalVolume(
             [0, 0, 0],
             [*xy, cu_absorber_lar_z],
             cu_absorber_lar,
             "cu_absorber_lar_inactive",
-            mothervolume,
-            registry,
+            b.mother_lv,
+            b.registry,
         )
 
-    peek_outside = geant4.solid.Box("peek_outside", 33.1, 9, 25, registry)
-    peek_inside = geant4.solid.Box("peek_inside", 14, 9, 15, registry)  # Drawing from S. Schönert
+    peek_outside = geant4.solid.Box("peek_outside", 33.1, 9, 25, b.registry)
+    peek_inside = geant4.solid.Box("peek_inside", 14, 9, 15, b.registry)  # Drawing from S. Schönert
     peek_holder = geant4.solid.Subtraction(
-        "peek_holder", peek_outside, peek_inside, [[0, 0, 0], [0, 0, -10 / 2]], registry
+        "peek_holder", peek_outside, peek_inside, [[0, 0, 0], [0, 0, -10 / 2]], b.registry
     )
-    peek_holder = geant4.LogicalVolume(peek_holder, materials.peek, "peek_holder", registry)
+    peek_holder = geant4.LogicalVolume(peek_holder, b.materials.peek, "peek_holder", b.registry)
     peek_holder.pygeom_color_rgba = (0.8, 1, 0, 1)
-    peek_holder_z = z0 + absorber_height / 2 + 25 / 2
+    peek_holder_z = z0 + ABSORBER_HEIGHT / 2 + 25 / 2
     geant4.PhysicalVolume(
         [0, 0, 0],
         [*xy, peek_holder_z],
         peek_holder,
         "peek_holder",
-        mothervolume,
-        registry,
+        b.mother_lv,
+        b.registry,
     )
+
+
+def _get_ta_absorber(b: core.InstrumentationData):
+    if "ta_absorber" in b.registry.logicalVolumeDict:
+        return b.registry.logicalVolumeDict["ta_absorber"]
+
+    ta_absorber_outer = geant4.solid.Tubs(
+        "ta_absorber_outer",
+        0,
+        16.2,  # estimate!
+        ABSORBER_HEIGHT,
+        0,
+        2 * math.pi,
+        b.registry,
+    )
+    ta_absorber_inner = geant4.solid.Tubs(
+        "ta_absorber_inner", 0, source_radius, source_height - source_outside, 0, 2 * math.pi, b.registry
+    )
+    ta_absorber = geant4.solid.Subtraction(
+        "ta_absorber",
+        ta_absorber_outer,
+        ta_absorber_inner,
+        [[0, 0, 0], [0, 0, (ABSORBER_HEIGHT - source_inside) / 2]],
+        b.registry,
+    )
+    return geant4.LogicalVolume(ta_absorber, b.materials.metal_tantalum, "ta_absorber", b.registry)
+
+
+def _sis_to_pygeoml200(sis_coord: float) -> float:
+    sis_ta_on_lar = 5315  # mm
+    h_absorber = 82.5  # mm - from Pin-Jung
+    h_funnel_to_lar_surface = 7333 - 5207  # mm (meterdrive readings from Matt's slides)
+    h_funnel = 90  # mm - from Matt's slides; _not_ including the Cu top plate thickness.
+    sis_top_plate = sis_ta_on_lar + h_absorber + h_funnel_to_lar_surface + h_funnel
+    return sis_coord - sis_top_plate
+
+
+def _parse_source_spec(src: str) -> dict:
+    src = src.split("+")
+    if src[0] not in ("Th228", "Ra"):
+        msg = f"Invalid source type {src[0]} in source spec"
+        raise ValueError(msg)
+    if set(src[1:]) - {"Cu"} != set():
+        msg = f"Unknown extra in source spec {src[1:]}"
+        raise ValueError(msg)
+    return {"type": src[0], "has_cu": "Cu" in src}
