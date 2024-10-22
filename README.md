@@ -11,7 +11,7 @@
 
 ## Installation and usage
 
-This package rerquires a working setup of
+This package requires a working setup of
 [`legend-metadata`](https://github.com/legend-exp/legend-metadata) before usage.
 
 Following a git checkout, the package and its other python dependencies can be
@@ -81,7 +81,7 @@ the colors. To use it, create a file `vis.mac` in the same directory:
 and use it with remage `remage vis.mac -i -g l200.gdml`. It will validate that
 the given GDML file can be read by Geant4 and show a visualization from it.
 
-It is also possible to use `--assmblies=` as described above. This will remove
+It is also possible to use `--assemblies=` as described above. This will remove
 any non-specified assembly from the output GDML file. Make sure that you do not
 overwrite any "production" geometry with this command. Using a file with
 stripped-down assemblies for a simulation will probably give wrong results.
