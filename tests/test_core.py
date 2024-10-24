@@ -4,6 +4,7 @@ from collections import Counter
 from pathlib import Path
 
 import numpy as np
+from pyg4ometry import gdml
 
 
 def test_import():
@@ -13,7 +14,7 @@ def test_import():
 def test_construct(tmp_path):
     from l200geom import core, det_utils
 
-    registry = core.construct(use_detailed_fiber_model=False)
+    registry = core.construct(use_detailed_fiber_model=True)
     # verify that we get the expected channel counts.
     ch_count = Counter([d.detector_type for f, d in det_utils.walk_detectors(registry)])
     assert ch_count["optical"] == 2 * (9 + 20)  # 2*(IB+OB)
@@ -21,7 +22,7 @@ def test_construct(tmp_path):
     det_file_detailed = tmp_path / "det-detailed.mac"
     det_utils.generate_detector_macro(registry, det_file_detailed)
 
-    registry = core.construct(use_detailed_fiber_model=True)
+    registry = core.construct(use_detailed_fiber_model=False)
     # verify that we get the expected channel counts.
     ch_count = Counter([d.detector_type for f, d in det_utils.walk_detectors(registry)])
     assert ch_count["optical"] == 2 * (9 + 20)  # 2*(IB+OB)
@@ -31,6 +32,19 @@ def test_construct(tmp_path):
 
     with Path.open(det_file_detailed) as f_det, Path.open(det_file_segmented) as f_seg:
         assert f_det.readlines() == f_seg.readlines()
+
+
+def test_read_back(tmp_path):
+    from l200geom import core
+
+    registry = core.construct(use_detailed_fiber_model=False)
+    # write a GDML file.
+    gdml_file_detailed = tmp_path / "segmented.gdml"
+    w = gdml.Writer()
+    w.addDetector(registry)
+    w.write(gdml_file_detailed)
+    # try to read it back.
+    gdml.Reader(gdml_file_detailed)
 
 
 def test_material_store():
