@@ -3,17 +3,19 @@ from __future__ import annotations
 import logging
 from collections.abc import Generator
 from dataclasses import dataclass
+from itertools import groupby
 from pathlib import Path
 from typing import Literal
 
 import pyg4ometry.geant4 as g4
+from pyg4ometry.gdml.Defines import Auxiliary
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
 class RemageDetectorInfo:
-    detector_type: Literal["optical", "germanium"]
+    detector_type: Literal["optical", "germanium", "scintillator"]
     uid: int
 
 
@@ -55,3 +57,28 @@ def generate_detector_macro(registry: g4.Registry, filename: str) -> None:
 
     with Path.open(filename, "w", encoding="utf-8") as f:
         f.write(macro_contents)
+
+
+def append_detector_auxvals(registry: g4.Registry) -> None:
+    """Append an auxiliary structure, storing the sensitive detector volume information.
+
+    The structure is a nested dict, stored as follows (read ``auxtype`: ``auxvalue``):
+
+    * "RMG_detector": ``det_type`` (see :class:`RemageDetectorInfo`)
+        * ``physvol->name``: ``det_uid``
+        * [...repeat...]
+    * [...repeat...]
+    """
+
+    written_pvs = set()
+    group_it = groupby(walk_detectors(registry), lambda d: d[1].detector_type)
+
+    for key, group in group_it:
+        group_aux = Auxiliary("RMG_detector", key, registry)
+
+        for pv, det in group:
+            if pv.name in written_pvs:
+                return
+            written_pvs.add(pv.name)
+
+            group_aux.addSubAuxiliary(Auxiliary(pv.name, det.uid, registry, addRegistry=False))
