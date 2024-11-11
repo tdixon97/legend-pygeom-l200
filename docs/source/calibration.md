@@ -1,0 +1,62 @@
+# Calibration sources
+
+**legend-pygeom-l200** can easily be used to include the calibration sources
+deployed with the SIS.
+
+As the position and types of sources frequently change, they are not hard-coded
+in the python code, but can be configured in a runtime configuration file.
+
+> [!NOTE]
+>
+> At the moment, only one source can be included using **legend-pygeom-l200** at
+> a time. This restriction will be removed in the future.
+
+**TL;DR**: a working example:
+
+```json
+{
+  "sis": {
+    "1": {
+      "sis_z": 8250,
+      "sources": [null, null, null, "Th228"]
+    },
+    "2": null,
+    "3": null,
+    "4": null
+  }
+}
+```
+
+## calibration source configuration
+
+The `sis` config object contains objects describing the deployed sources in each
+of the four SIS tube (or `null`, if no sources are deployed in that tube). The
+numbering equals the "official" SIS numbering scheme.
+
+The `sis_z` coordinate is the SIS reading of the deployed SIS strings. The
+coordinate is transformed into simulation coordinates as described on [the
+Confluence page][confluence-coord].
+
+Each SIS string has four slots for sources, that can be filled differently with
+this tool. The `sources` array contains the four slots from the top to the
+bottom. The bottom source is seated on top of the tantalum absorber.
+
+Different types of sources can be included in the slots:
+
+- `Th228` — a normal LEGEND calibration source (as described in [L. Baudis _et
+  al_ 2023 _JINST_ 18 P02001][citation-source]).
+- `Ra` — a special calibration source.
+- ...`+Cu` — add a copper absorber cap to any other source. The dimensions of
+  the cap can be seen in the code.
+
+> [!NOTE]
+>
+> The generated geometry does **not contain the requested source material**. The
+> decaying isotope has to be configured in the user's Geant4/remage macro file.
+>
+> The volume named `source_inner` can be used as the confinement volume in
+> remage.
+
+[confluence-coord]:
+  https://legend-exp.atlassian.net/wiki/spaces/LEGEND/pages/1111785478/Calibration+simulations#Source-geometry-%2F-position
+[citation-source]: https://doi.org/10.1088/1748-0221/18/02/P02001
