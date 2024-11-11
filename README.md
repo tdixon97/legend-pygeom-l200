@@ -28,6 +28,16 @@ After installation, the CLI utility `legend-pygeom-l200` is provided on your
 PATH. This CLI utility is the primary way to interact with this package. For
 now, you can find usage docs by running `legend-pygeom-l200 -h`.
 
+## Runtime configuration
+
+For often-changing details of the geometry are configured using a runtime
+configuration JSON file. This file is specified using the `--config $FILE`
+parameter.
+
+Detailed information about the configurable subsystems is available:
+
+- [Calibration system (SIS)](docs/source/calibration.md)
+
 ## Visualization of the geometry
 
 ### Visualization with `legend-pygeom-l200`
