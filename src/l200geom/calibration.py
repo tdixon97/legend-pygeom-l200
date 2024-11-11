@@ -87,32 +87,14 @@ cu_absorber_height = 15 - 0.01  # mm, drawing from S. Schönert
 cu_absorber_inner_height = 12.5
 
 
-def _place_ta_absorber_with_source(
+def _place_source(
     b: core.InstrumentationData,
     prefix: str,
     xy,
-    delta_z: float,
+    z0: float,
     source_type: Literal["Th228", "Ra"],
     cu_absorber: bool,
 ) -> None:
-    """Place tantalum absorber plus source container.
-
-    delta_z
-        to absorber top from top plate top
-    """
-    z0 = b.top_plate_z_pos - delta_z - ABSORBER_HEIGHT / 2
-
-    # all positions from MaGe, might be incorrect!
-    ta_absorber_lv = _get_ta_absorber(b)
-    geant4.PhysicalVolume(
-        [0, 0, 0],
-        [*xy, z0],
-        ta_absorber_lv,
-        "ta_absorber_3",
-        b.mother_lv,
-        b.registry,
-    )
-
     source_outer = geant4.solid.Tubs(
         "source_outer", 0, source_radius, source_height, 0, 2 * math.pi, b.registry
     )
@@ -203,6 +185,35 @@ def _place_ta_absorber_with_source(
             b.mother_lv,
             b.registry,
         )
+
+
+def _place_ta_absorber_with_source(
+    b: core.InstrumentationData,
+    prefix: str,
+    xy,
+    delta_z: float,
+    source_type: Literal["Th228", "Ra"],
+    cu_absorber: bool,
+) -> None:
+    """Place tantalum absorber plus source container.
+
+    delta_z
+        to absorber top from top plate top
+    """
+    z0 = b.top_plate_z_pos - delta_z - ABSORBER_HEIGHT / 2
+
+    # all positions from MaGe, might be incorrect!
+    ta_absorber_lv = _get_ta_absorber(b)
+    geant4.PhysicalVolume(
+        [0, 0, 0],
+        [*xy, z0],
+        ta_absorber_lv,
+        "ta_absorber_3",
+        b.mother_lv,
+        b.registry,
+    )
+
+    _place_source(b, prefix, xy, z0, source_type, cu_absorber)
 
     peek_outside = geant4.solid.Box("peek_outside", 33.1, 9, 25, b.registry)
     peek_inside = geant4.solid.Box("peek_inside", 14, 9, 15, b.registry)  # Drawing from S. Schönert
