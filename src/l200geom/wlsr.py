@@ -77,7 +77,7 @@ def place_wlsr(
     wlsr_outer_lv, wlsr_ttx_lv, wlsr_tpb_lv = _construct_wlsr(b.materials, b.registry)
 
     wlsr_outer_pv = g4.PhysicalVolume(
-        [0, 0, 0], [0, 0, z_displacement], wlsr_outer_lv, "wlsr_outer", b.mother_lv, reg
+        [0, 0, 0], [0, 0, z_displacement - wlsr_height / 2], wlsr_outer_lv, "wlsr_outer", b.mother_lv, reg
     )
     wlsr_ttx_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, 0], wlsr_ttx_lv, "wlsr_ttx", wlsr_outer_lv, reg)
     wlsr_tpb_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, 0], wlsr_tpb_lv, "wlsr_tpb", wlsr_ttx_lv, reg)

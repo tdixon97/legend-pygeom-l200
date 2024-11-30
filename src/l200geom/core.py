@@ -67,11 +67,11 @@ def construct(
     cryostat_lv = cryo.construct_cryostat(mats.metal_steel, reg)
     cryo.place_cryostat(cryostat_lv, world_lv, coordinate_z_displacement, reg)
 
-    lar_lv = cryo.construct_argon(mats.liquidargon, reg)
+    lar_lv, lar_neck_height = cryo.construct_argon(mats.liquidargon, reg)
     lar_pv = cryo.place_argon(lar_lv, cryostat_lv, coordinate_z_displacement, reg)
 
     # top of the top plate, this is still a dummy value!
-    top_plate_z_pos = 1700
+    top_plate_z_pos = 1000
 
     timestamp = config.get("metadata_timestamp", "20230311T235840Z")
     channelmap = load_dict_from_config(config, "channelmap", lambda: lmeta.channelmap(timestamp))
@@ -80,12 +80,12 @@ def construct(
         lar_lv, lar_pv, mats, reg, channelmap, special_metadata, AttrsDict(config), top_plate_z_pos
     )
 
+    # Place all instrumentation into the liquid argon
     if "wlsr" in assemblies:
-        # Place the WLSR into the cryostat.
-        # TODO: the z offset here is still a dummy value?
-        wlsr.place_wlsr(instr, 3 * 180, reg)
+        # height below the lower end of the neck (even though this intended dimension is quite certainly
+        # not really met in reality, P. Krause estimates ~cm uncertainty).
+        wlsr.place_wlsr(instr, lar_neck_height - 1247.41, reg)
 
-    # Place all other instrumentation into the liquid argon
     if "strings" in assemblies:
         hpge_strings.place_hpge_strings(instr)
     if "calibration" in assemblies:
