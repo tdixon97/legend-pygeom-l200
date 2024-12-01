@@ -144,5 +144,5 @@ def place_argon(
     reg: g4.Registry,
 ) -> g4.PhysicalVolume:
     lar_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, cryostat_displacement_z], lar_lv, "lar", cryostat_lv, reg)
-    lar_lv.pygeom_color_rgba = [0, 0, 0, 0.1]
+    lar_lv.pygeom_color_rgba = [0, 0, 0, 0.03]
     return lar_pv

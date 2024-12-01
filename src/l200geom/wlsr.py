@@ -82,7 +82,7 @@ def place_wlsr(
     wlsr_ttx_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, 0], wlsr_ttx_lv, "wlsr_ttx", wlsr_outer_lv, reg)
     wlsr_tpb_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, 0], wlsr_tpb_lv, "wlsr_tpb", wlsr_ttx_lv, reg)
 
-    wlsr_ttx_lv.pygeom_color_rgba = [1, 1, 1, 0.5]
+    wlsr_ttx_lv.pygeom_color_rgba = [1, 1, 1, 0.2]
     wlsr_tpb_lv.pygeom_color_rgba = False
     wlsr_outer_lv.pygeom_color_rgba = False
 
