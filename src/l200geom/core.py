@@ -70,8 +70,14 @@ def construct(
     lar_lv, lar_neck_height = cryo.construct_argon(mats.liquidargon, reg)
     lar_pv = cryo.place_argon(lar_lv, cryostat_lv, coordinate_z_displacement, reg)
 
-    # top of the top plate, this is still a dummy value!
-    top_plate_z_pos = 1000
+    # top of the top plate. While this value looks very specific, it is still a dummy value!
+    # TODO: is the top of the neck the zero point of LT151?
+    top_plate_z_pos = lar_neck_height + (
+        1816.5  # to the top of the neck, interpolated from the drawing in [Knoepfle2022]_.
+        - 1479  # LT151 sensor reading on 2024-05-26 (same day as the immersioin measurement).
+        - (7333 - 5205)  # meterdrive readings after full immersion and when top of funnel touches LAr.
+        - 90  # funnel height to top of copper plate.
+    )
 
     timestamp = config.get("metadata_timestamp", "20230311T235840Z")
     channelmap = load_dict_from_config(config, "channelmap", lambda: lmeta.channelmap(timestamp))
