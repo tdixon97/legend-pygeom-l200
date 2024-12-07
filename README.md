@@ -98,13 +98,15 @@ stripped-down assemblies for a simulation will probably give wrong results.
 
 ### Adjusting the visualization from python
 
-See the [legend-pygeom-tools docs](https://legend-pygeom-tools.readthedocs.io/en/latest/).
+See the
+[legend-pygeom-tools docs](https://legend-pygeom-tools.readthedocs.io/en/latest/).
 
 ## Further features (for developers)
 
 ### Registering detectors for use with [`remage`](https://github.com/legend-exp/remage)
 
-See the [legend-pygeom-tools docs](https://legend-pygeom-tools.readthedocs.io/en/latest/).
+See the
+[legend-pygeom-tools docs](https://legend-pygeom-tools.readthedocs.io/en/latest/).
 
 This information can be exported by using `--det-macro-file=l200-dets.mac` as an
 additional CLI option. This macro then should be `/control/execute`d in your
