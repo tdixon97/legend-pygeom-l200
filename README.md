@@ -98,32 +98,13 @@ stripped-down assemblies for a simulation will probably give wrong results.
 
 ### Adjusting the visualization from python
 
-On a logical volume instance, you can set `pygeom_color_rgba`, e.g.
-
-```python3
-lv = g4.LogicalVolume(...)
-
-# hide this volume in the visualization
-lv.pygeom_color_rgba = False
-
-# set the vis coloring to the given RGBA value. All 4 numbers should be given in the range 0–1.
-lv.pygeom_color_rgba = (r, g, b, a)
-```
+See the [legend-pygeom-tools docs](https://legend-pygeom-tools.readthedocs.io/en/latest/).
 
 ## Further features (for developers)
 
 ### Registering detectors for use with [`remage`](https://github.com/legend-exp/remage)
 
-On a physical volume instance, you can set `pygeom_active_dector`, e.g.
-
-```python3
-from .det_utils import RemageDetectorInfo
-
-pv = g4.PhysicalVolume(...)
-
-# attach an active detector to this physical volume.
-lv.pygeom_active_dector = RemageDetectorInfo("optical", 1)
-```
+See the [legend-pygeom-tools docs](https://legend-pygeom-tools.readthedocs.io/en/latest/).
 
 This information can be exported by using `--det-macro-file=l200-dets.mac` as an
 additional CLI option. This macro then should be `/control/execute`d in your
