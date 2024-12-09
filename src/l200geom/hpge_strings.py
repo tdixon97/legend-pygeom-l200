@@ -8,7 +8,7 @@ from importlib import resources
 import numpy as np
 import pyg4ometry
 from legendhpges import make_hpge
-from legendmeta import AttrsDict
+from legendmeta import AttrsDict, TextDB
 from pyg4ometry import geant4
 from pygeomtools import RemageDetectorInfo
 from scipy.spatial.transform import Rotation
@@ -18,20 +18,27 @@ from . import core, materials
 log = logging.getLogger(__name__)
 
 
-def place_hpge_strings(b: core.InstrumentationData) -> None:
+def place_hpge_strings(hpge_metadata: TextDB, b: core.InstrumentationData) -> None:
     """Construct LEGEND-200 HPGe strings."""
     # derive the strings from the channelmap.
     ch_map = b.channelmap.map("system", unique=False).geds.values()
     strings_to_build = {}
 
-    for hpge_meta in ch_map:
+    for ch_meta in ch_map:
+        # ch_meta might be a full channelmap entry, i.e. containing the merged hardware meta from
+        # lmeta.channelmap(), or a shallow dict with only channel data. So combine them with the hardware
+        # data again.
+        hpge_meta = hpge_metadata[ch_meta.name]
+        assert hpge_meta.name == ch_meta.name
+        full_meta = ch_meta | hpge_meta
+
         # Temporary fix for gedet with null enrichment value
         if hpge_meta.production.enrichment is None:
             log.warning("%s has no enrichment in metadata - setting to dummy value 0.86!", hpge_meta.name)
             hpge_meta.production.enrichment = 0.86
 
-        hpge_string_id = str(hpge_meta.location.string)
-        hpge_unit_id_in_string = hpge_meta.location.position
+        hpge_string_id = str(ch_meta.location.string)
+        hpge_unit_id_in_string = ch_meta.location.position
 
         if hpge_string_id not in strings_to_build:
             strings_to_build[hpge_string_id] = {}
@@ -40,12 +47,12 @@ def place_hpge_strings(b: core.InstrumentationData) -> None:
         strings_to_build[hpge_string_id][hpge_unit_id_in_string] = HPGeDetUnit(
             hpge_meta.name,
             hpge_meta.production.manufacturer,
-            hpge_meta.daq.rawid,
-            make_hpge(hpge_meta, b.registry),
+            ch_meta.daq.rawid,
+            make_hpge(full_meta, b.registry),
             hpge_meta.geometry.height_in_mm,
             hpge_extra_meta["baseplate"],
             hpge_extra_meta["rodlength_in_mm"],
-            hpge_meta,
+            full_meta,
         )
 
     # now, build all strings.

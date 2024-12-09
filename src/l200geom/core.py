@@ -101,7 +101,7 @@ def construct(
         wlsr.place_wlsr(instr, lar_neck_height - 1247.41, reg)
 
     if "strings" in assemblies:
-        hpge_strings.place_hpge_strings(instr)
+        hpge_strings.place_hpge_strings(lmeta.hardware.detectors.germanium.diodes, instr)
     if "calibration" in assemblies:
         calibration.place_calibration_system(instr)
     if "top" in assemblies:
