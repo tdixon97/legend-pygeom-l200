@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from importlib import resources
 from typing import NamedTuple
 
@@ -9,6 +10,8 @@ from pygeomtools import detectors, geometry, visualization
 from pygeomtools.utils import load_dict_from_config
 
 from . import calibration, cryo, fibers, hpge_strings, materials, top, wlsr
+
+log = logging.getLogger(__name__)
 
 lmeta = LegendMetadata()
 configs = TextDB(resources.files("l200geom") / "configs")
@@ -70,12 +73,18 @@ def construct(
     lar_lv, lar_neck_height = cryo.construct_argon(mats.liquidargon, reg)
     lar_pv = cryo.place_argon(lar_lv, cryostat_lv, coordinate_z_displacement, reg)
 
-    # top of the top plate. While this value looks very specific, it is still a dummy value!
-    top_plate_z_pos = lar_neck_height + (
-        2210  # from lower end of neck to the top of the manifold (where LT151 is attached); from a drawing.
-        - 1479  # LT151 sensor reading on 2024-05-26 (same day as the immersion measurement).
-        - (7333 - 5205)  # meterdrive readings after full immersion and when top of funnel touches LAr.
-        - 90  # top of funnel to top of copper plate.
+    array_total_height = 1488  # 1484 to 1490 mm array height (OB bottom to copper plate top).
+    top_plate_z_pos_relative_to_neck = (
+        7300  # end position meterdrive reading.
+        - 1641  # meterdrive reading when OB touches shutter.
+        - (1222 + 440 + 195.15 + 354 + 510)  # distance to shutter bottom flange.
+        - (74 + (180 - 74) / 2)  # distance to the actual shutter surface.
+        - array_total_height
+    )
+    top_plate_z_pos = lar_neck_height - top_plate_z_pos_relative_to_neck
+
+    log.info(
+        "displacement from cryostat center (positive to top): %f mm", top_plate_z_pos - array_total_height / 2
     )
 
     timestamp = config.get("metadata_timestamp", "20230311T235840Z")
