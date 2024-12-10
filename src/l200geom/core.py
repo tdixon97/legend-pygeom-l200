@@ -14,7 +14,7 @@ from . import calibration, cryo, fibers, hpge_strings, materials, top, wlsr
 log = logging.getLogger(__name__)
 
 lmeta = LegendMetadata()
-configs = TextDB(resources.files("l200geom") / "configs")
+configs = TextDB(resources.files("l200geom") / "configs" / "extra_meta")
 
 DEFINED_ASSEMBLIES = ["wlsr", "strings", "calibration", "fibers", "top"]
 
