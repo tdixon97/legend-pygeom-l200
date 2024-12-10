@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 
+from pyg4ometry import config as meshconfig
 from pyg4ometry import gdml
 from pygeomtools import detectors, utils, visualization
 
@@ -39,8 +40,9 @@ def dump_gdml_cli() -> None:
     parser.add_argument(
         "--visualize",
         "-V",
-        action="store_true",
-        help="""Open a VTK visualization of the generated geometry""",
+        nargs="?",
+        const=True,
+        help="""Open a VTK visualization of the generated geometry (with optional scene file)""",
     )
     parser.add_argument(
         "--vis-macro-file",
@@ -102,8 +104,14 @@ def dump_gdml_cli() -> None:
     if args.config:
         config = utils.load_dict(args.config)
 
+    vis_scene = {}
+    if isinstance(args.visualize, str):
+        vis_scene = utils.load_dict(args.visualize)
+        if vis_scene.get("fine_mesh", False):
+            meshconfig.setGlobalMeshSliceAndStack(100)
+
     registry = core.construct(
-        assemblies=args.assemblies.split(","),
+        assemblies=[a for a in args.assemblies.split(",") if a != ""],
         use_detailed_fiber_model=args.fiber_modules == "detailed",
         config=config,
     )
@@ -130,4 +138,4 @@ def dump_gdml_cli() -> None:
         log.info("visualizing...")
         from pygeomtools import viewer
 
-        viewer.visualize(registry)
+        viewer.visualize(registry, vis_scene)
