@@ -77,12 +77,12 @@ def place_wlsr(
     wlsr_outer_lv, wlsr_ttx_lv, wlsr_tpb_lv = _construct_wlsr(b.materials, b.registry)
 
     wlsr_outer_pv = g4.PhysicalVolume(
-        [0, 0, 0], [0, 0, z_displacement], wlsr_outer_lv, "wlsr_outer", b.mother_lv, reg
+        [0, 0, 0], [0, 0, z_displacement - wlsr_height / 2], wlsr_outer_lv, "wlsr_outer", b.mother_lv, reg
     )
     wlsr_ttx_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, 0], wlsr_ttx_lv, "wlsr_ttx", wlsr_outer_lv, reg)
     wlsr_tpb_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, 0], wlsr_tpb_lv, "wlsr_tpb", wlsr_ttx_lv, reg)
 
-    wlsr_ttx_lv.pygeom_color_rgba = [1, 1, 1, 0.5]
+    wlsr_ttx_lv.pygeom_color_rgba = [1, 1, 1, 0.2]
     wlsr_tpb_lv.pygeom_color_rgba = False
     wlsr_outer_lv.pygeom_color_rgba = False
 
@@ -98,7 +98,7 @@ def _add_surfaces_wlsr(
 ):
     mats, reg = b.materials, b.registry
     # between TPB and TTX, only one surface should be enough.
-    g4.BorderSurface("bsurface_tpb_ttx", wlsr_tpb_pv, wlsr_ttx_pv, mats.surfaces.wlsr_tpb_to_tetratex, reg)
+    g4.BorderSurface("bsurface_tpb_ttx", wlsr_tpb_pv, wlsr_ttx_pv, mats.surfaces.to_tetratex, reg)
 
     # between LAr and TPB we need a surface in both directions.
     g4.BorderSurface("bsurface_wlsr_tpb_lar", b.mother_pv, wlsr_tpb_pv, mats.surfaces.lar_to_tpb, reg)

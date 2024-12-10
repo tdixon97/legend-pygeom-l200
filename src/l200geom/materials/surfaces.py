@@ -85,13 +85,13 @@ class OpticalSurfaceRegistry:
         return self._to_germanium
 
     @property
-    def wlsr_tpb_to_tetratex(self) -> g4.solid.OpticalSurface:
+    def to_tetratex(self) -> g4.solid.OpticalSurface:
         """Reflective surface Tetratex diffuse reflector."""
-        if hasattr(self, "_wlsr_tpb_to_tetratex"):
-            return self._wlsr_tpb_to_tetratex
+        if hasattr(self, "_to_tetratex"):
+            return self._to_tetratex
 
-        self._wlsr_tpb_to_tetratex = g4.solid.OpticalSurface(
-            "surface_wlsr_tpb_to_tetratex",
+        self._to_tetratex = g4.solid.OpticalSurface(
+            "surface_to_tetratex",
             finish="groundfrontpainted",  # only lambertian reflection
             model=self._model,
             surf_type="dielectric_dielectric",
@@ -100,11 +100,11 @@ class OpticalSurfaceRegistry:
         )
 
         legendoptics.tetratex.pyg4_tetratex_attach_reflectivity(
-            self._wlsr_tpb_to_tetratex,
+            self._to_tetratex,
             self.g4_registry,
         )
 
-        return self._wlsr_tpb_to_tetratex
+        return self._to_tetratex
 
     @property
     def to_sipm_silicon(self) -> g4.solid.OpticalSurface:

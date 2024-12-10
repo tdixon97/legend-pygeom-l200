@@ -87,7 +87,17 @@ def place_cryostat(
     return cryostat_pv
 
 
-def construct_argon(lar_material: g4.Material, reg: g4.Registry) -> g4.LogicalVolume:
+def construct_argon(lar_material: g4.Material, reg: g4.Registry) -> tuple[g4.LogicalVolume, float]:
+    """Construct an approximate LEGEND-200 argon volume.
+
+    Returns
+    -------
+    logical volume instance and height of the cryostat neck relative to the origin of the argon volume.
+
+    .. note::
+        the constructed volume's center (i.e. for children placed at 0,0,0) is not the barycenter of the
+        volume, but the center of the central tubular section of the cryostat.
+    """
     lar_access_height = cryo_access_height - 800
     lar_top = g4.solid.Ellipsoid(
         "lar_top",
@@ -134,7 +144,10 @@ def construct_argon(lar_material: g4.Material, reg: g4.Registry) -> g4.LogicalVo
         reg,
     )
 
-    return g4.LogicalVolume(lar, lar_material, "lar", reg)
+    neck_height = (
+        cryo_tub_height / 2 + cryo_top_height - 20
+    )  # offset is below the "virtual" top point of the round segment (see technical drawing)
+    return g4.LogicalVolume(lar, lar_material, "lar", reg), neck_height
 
 
 def place_argon(
@@ -144,5 +157,5 @@ def place_argon(
     reg: g4.Registry,
 ) -> g4.PhysicalVolume:
     lar_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, cryostat_displacement_z], lar_lv, "lar", cryostat_lv, reg)
-    lar_lv.pygeom_color_rgba = [0, 0, 0, 0.1]
+    lar_lv.pygeom_color_rgba = [0, 0, 0, 0.03]
     return lar_pv

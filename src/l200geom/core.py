@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from importlib import resources
 from typing import NamedTuple
 
@@ -9,6 +10,8 @@ from pygeomtools import detectors, geometry, visualization
 from pygeomtools.utils import load_dict_from_config
 
 from . import calibration, cryo, fibers, hpge_strings, materials, top, wlsr
+
+log = logging.getLogger(__name__)
 
 lmeta = LegendMetadata()
 configs = TextDB(resources.files("l200geom") / "configs")
@@ -67,11 +70,22 @@ def construct(
     cryostat_lv = cryo.construct_cryostat(mats.metal_steel, reg)
     cryo.place_cryostat(cryostat_lv, world_lv, coordinate_z_displacement, reg)
 
-    lar_lv = cryo.construct_argon(mats.liquidargon, reg)
+    lar_lv, lar_neck_height = cryo.construct_argon(mats.liquidargon, reg)
     lar_pv = cryo.place_argon(lar_lv, cryostat_lv, coordinate_z_displacement, reg)
 
-    # top of the top plate, this is still a dummy value!
-    top_plate_z_pos = 1700
+    array_total_height = 1488  # 1484 to 1490 mm array height (OB bottom to copper plate top).
+    top_plate_z_pos_relative_to_neck = (
+        7300  # end position meterdrive reading.
+        - 1641  # meterdrive reading when OB touches shutter.
+        - (1222 + 440 + 195.15 + 354 + 510)  # distance to shutter bottom flange.
+        - (74 + (180 - 74) / 2)  # distance to the actual shutter surface.
+        - array_total_height
+    )
+    top_plate_z_pos = lar_neck_height - top_plate_z_pos_relative_to_neck
+
+    log.info(
+        "displacement from cryostat center (positive to top): %f mm", top_plate_z_pos - array_total_height / 2
+    )
 
     timestamp = config.get("metadata_timestamp", "20230311T235840Z")
     channelmap = load_dict_from_config(config, "channelmap", lambda: lmeta.channelmap(timestamp))
@@ -80,12 +94,12 @@ def construct(
         lar_lv, lar_pv, mats, reg, channelmap, special_metadata, AttrsDict(config), top_plate_z_pos
     )
 
+    # Place all instrumentation into the liquid argon
     if "wlsr" in assemblies:
-        # Place the WLSR into the cryostat.
-        # TODO: the z offset here is still a dummy value?
-        wlsr.place_wlsr(instr, 3 * 180, reg)
+        # height below the lower end of the neck (even though this intended dimension is quite certainly
+        # not really met in reality, P. Krause estimates ~cm uncertainty).
+        wlsr.place_wlsr(instr, lar_neck_height - 1247.41, reg)
 
-    # Place all other instrumentation into the liquid argon
     if "strings" in assemblies:
         hpge_strings.place_hpge_strings(instr)
     if "calibration" in assemblies:
