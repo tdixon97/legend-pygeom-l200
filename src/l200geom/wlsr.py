@@ -98,7 +98,7 @@ def _add_surfaces_wlsr(
 ):
     mats, reg = b.materials, b.registry
     # between TPB and TTX, only one surface should be enough.
-    g4.BorderSurface("bsurface_tpb_ttx", wlsr_tpb_pv, wlsr_ttx_pv, mats.surfaces.wlsr_tpb_to_tetratex, reg)
+    g4.BorderSurface("bsurface_tpb_ttx", wlsr_tpb_pv, wlsr_ttx_pv, mats.surfaces.to_tetratex, reg)
 
     # between LAr and TPB we need a surface in both directions.
     g4.BorderSurface("bsurface_wlsr_tpb_lar", b.mother_pv, wlsr_tpb_pv, mats.surfaces.lar_to_tpb, reg)

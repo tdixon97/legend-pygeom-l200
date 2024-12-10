@@ -53,6 +53,7 @@ def place_fiber_modules(
         - top.TOP_PLATE_THICKNESS
         - ModuleFactoryBase.SIPM_HEIGHT
         - ModuleFactoryBase.SIPM_OUTER_EXTRA
+        - 25  # the SiPMs are below the top plate. dummy value (guessed from photos).
     )
 
     # note: actually the radius is only 150mm and another short straight segment of 60mm is following after
@@ -236,16 +237,18 @@ class ModuleFactoryBase(ABC):
         )
         self.sipm_outer_top_lv = g4.LogicalVolume(
             sipm_outer_top,
-            self.materials.metal_copper,
+            self.materials.tetratex,
             f"sipm_outer_top{v_suffix}",
             self.registry,
         )
         self.sipm_outer_bottom_lv = g4.LogicalVolume(
             sipm_outer_bottom,
-            self.materials.metal_copper,
+            self.materials.tetratex,
             f"sipm_outer_bottom{v_suffix}",
             self.registry,
         )
+        # note: this is tetratex here, but do not add a surface here. I do not want to have the reflectivity
+        # on the inside.
 
         # TODO: implement partial modules with end envelopes for SiPM.
         # sipm_outer_end = g4.solid.Box(
@@ -257,7 +260,7 @@ class ModuleFactoryBase(ABC):
         # )
         # g4.LogicalVolume(
         #    sipm_outer_end,
-        #    self.materials.metal_copper,
+        #    self.materials.tetratex,
         #    f"sipm_outer_end{v_suffix}",
         #    self.registry,
         # )
@@ -396,10 +399,12 @@ class ModuleFactorySingleFibers(ModuleFactoryBase):
         )
         self.sipm_outer_bottom_lv_bend = g4.LogicalVolume(
             sipm_outer_bottom,
-            self.materials.metal_copper,
+            self.materials.tetratex,
             f"sipm_outer_bottom{v_suffix}",
             self.registry,
         )
+        # note: this is tetratex here, but do not add a surface here. I do not want to have the reflectivity
+        # on the inside.
 
     def _cached_fiber_volumes(self) -> None:
         """Create solids, logical and physical volumes for the fibers, as specified by the parameters of this instance."""
@@ -803,10 +808,12 @@ class ModuleFactorySegment(ModuleFactoryBase):
         )
         self.sipm_outer_bottom_lv_bend = g4.LogicalVolume(
             sipm_outer_bottom,
-            self.materials.metal_copper,
+            self.materials.tetratex,
             f"sipm_outer_bottom{v_suffix}",
             self.registry,
         )
+        # note: this is tetratex here, but do not add a surface here. I do not want to have the reflectivity
+        # on the inside.
 
     def _cached_fiber_volumes(self) -> None:
         """Create solids, logical and physical volumes for the fibers, as specified by the parameters of this instance."""
