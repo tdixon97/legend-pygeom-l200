@@ -10,11 +10,14 @@ from pygeomtools import detectors, geometry, visualization
 from pygeomtools.utils import load_dict_from_config
 
 from . import calibration, cryo, fibers, hpge_strings, materials, top, wlsr
+from .metadata import PublicMetadataProxy
 
 log = logging.getLogger(__name__)
 
 lmeta = LegendMetadata()
-configs = TextDB(resources.files("l200geom") / "configs")
+if lmeta._repo_path == "":
+    lmeta = None
+configs = TextDB(resources.files("l200geom") / "configs" / "extra_meta")
 
 DEFINED_ASSEMBLIES = ["wlsr", "strings", "calibration", "fibers", "top"]
 
@@ -88,8 +91,20 @@ def construct(
     )
 
     timestamp = config.get("metadata_timestamp", "20230311T235840Z")
-    channelmap = load_dict_from_config(config, "channelmap", lambda: lmeta.channelmap(timestamp))
+    if lmeta is not None and "metadata_timestamp" in config:
+        msg = "metadata_timestamp cannot be specified for public dummy geometry"
+        raise ValueError(msg)
     special_metadata = load_dict_from_config(config, "special_metadata", lambda: configs.on(timestamp))
+    if lmeta is None:
+        log.warning("CONSTRUCTING GEOMETRY FROM PUBLIC DATA ONLY")
+        dummy_geom = PublicMetadataProxy()
+        dummy_geom.update_special_metadata(special_metadata)
+
+    channelmap = load_dict_from_config(
+        config,
+        "channelmap",
+        lambda: lmeta.channelmap(timestamp) if lmeta is not None else dummy_geom.chmap,
+    )
     instr = InstrumentationData(
         lar_lv, lar_pv, mats, reg, channelmap, special_metadata, AttrsDict(config), top_plate_z_pos
     )
@@ -101,13 +116,15 @@ def construct(
         wlsr.place_wlsr(instr, lar_neck_height - 1247.41, reg)
 
     if "strings" in assemblies:
-        hpge_strings.place_hpge_strings(instr)
+        hw_meta = lmeta.hardware.detectors.germanium.diodes if lmeta is not None else dummy_geom.diodes
+        hpge_strings.place_hpge_strings(hw_meta, instr)
     if "calibration" in assemblies:
         calibration.place_calibration_system(instr)
     if "top" in assemblies:
         top.place_top_plate(instr)
     if "fibers" in assemblies:
-        fibers.place_fiber_modules(lmeta.hardware.detectors.lar.fibers, instr, use_detailed_fiber_model)
+        hw_meta = lmeta.hardware.detectors.lar.fibers if lmeta is not None else dummy_geom.fibers
+        fibers.place_fiber_modules(hw_meta, instr, use_detailed_fiber_model)
 
     _assign_common_copper_surface(instr)
 
