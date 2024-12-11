@@ -31,7 +31,10 @@ def test_construct(tmp_path):
     det_file_segmented = tmp_path / "det-segmented.mac"
     detectors.generate_detector_macro(registry, det_file_segmented)
 
-    with Path.open(det_file_detailed) as f_det, Path.open(det_file_segmented) as f_seg:
+    with (
+        Path(det_file_detailed).open(encoding="utf-8") as f_det,
+        Path(det_file_segmented).open(encoding="utf-8") as f_seg,
+    ):
         assert f_det.readlines() == f_seg.readlines()
 
 
