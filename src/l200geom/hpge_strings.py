@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 def place_hpge_strings(hpge_metadata: TextDB, b: core.InstrumentationData) -> None:
     """Construct LEGEND-200 HPGe strings."""
     # derive the strings from the channelmap.
-    ch_map = b.channelmap.map("system", unique=False).geds.values()
+    ch_map = b.channelmap.map("system", unique=False).get("geds", {}).values()
     strings_to_build = {}
 
     for ch_meta in ch_map:
