@@ -8,19 +8,23 @@ in the python code, but can be configured in a runtime configuration file.
 
 **TL;DR**: a working example:
 
-```json
-{
-  "sis": {
-    "1": {
-      "sis_z": 8250,
-      "sources": ["Th228", null, null, "Th228"]
-    },
-    "2": null,
-    "3": null,
-    "4": null
-  }
-}
+```yaml
+sis:
+  "1":
+    sis_z: 8250
+    sources: ["Th228", null, null, "Th228"]
+  "2": null
+  "3": null
+  "4": null
 ```
+
+> [!WARNING]
+>
+> With all parameters mentioned on this page, it is very easy to produce
+> "overlaps" in the resulting geometry (i.e. the source being in the same spot
+> as another part of the geometry). Overlaps will lead to unpredictable problems
+> while simulating. It is very important that you run a `remage`-based overlap
+> check at least once for any set of parameters.
 
 ## calibration source configuration
 
@@ -54,6 +58,38 @@ Different types of sources can be included in the slots:
 > The volumes named `source_inner_sis{SIS number}_source{slot}` can be used as
 > the confinement volumes in remage (i.e. with a regex `^source_inner_.*`, if
 > all sources share an isotope).
+
+## extra source outside SIS
+
+It is also possible to add an extra source, that is not part of any SIS string,
+via a config file. all notes on SIS sources above also apply to this extra
+source.
+
+```yaml
+extra_source:
+  # x, y, z coordinates. z extends positively downwards, z = 0 is a source
+  # "screwed into the top plate" (i.e. z is the coordinate of the top face of the
+  # volume the source wopuld normally be screwed into.
+  position_in_mm: [0, 0, 700]
+  # to identify in geometry, this produces a volume `source_inner{name}`
+  name: "_central"
+  source: "Th228+Cu"
+```
+
+## copper absorber
+
+The dimensions of the optional copper absorber can be adjusted in the runtime
+config, as this part is often replaced. It is the users responsibility to make
+sure that the absorber does not overlap with any other part of the geometry, and
+is in the right position.
+
+```yaml
+cu_absorber:
+  height: 13.6
+  inner_height: 10.6
+  inner_radius: 3.2
+  outer_radius: 6.2
+```
 
 [confluence-coord]:
   https://legend-exp.atlassian.net/wiki/spaces/LEGEND/pages/1111785478/Calibration+simulations#Source-geometry-%2F-position
