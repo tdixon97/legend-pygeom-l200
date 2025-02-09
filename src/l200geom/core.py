@@ -6,8 +6,9 @@ import os
 from importlib import resources
 from typing import NamedTuple
 
+from dbetto import AttrsDict, TextDB
 from git import GitCommandError
-from legendmeta import AttrsDict, LegendMetadata, TextDB
+from legendmeta import LegendMetadata
 from pyg4ometry import geant4
 from pygeomtools.utils import load_dict_from_config
 

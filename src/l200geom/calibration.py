@@ -5,7 +5,7 @@ import math
 from typing import Literal
 
 import numpy as np
-from legendmeta import AttrsDict
+from dbetto import AttrsDict
 from pyg4ometry import geant4
 
 from . import core, hpge_strings
