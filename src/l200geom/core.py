@@ -9,7 +9,6 @@ from typing import NamedTuple
 from dbetto import AttrsDict, TextDB
 from git import GitCommandError
 from legendmeta import LegendMetadata
-from legendmeta import _version as lmeta_version
 from pyg4ometry import geant4
 from pygeomtools.utils import load_dict_from_config
 
@@ -69,14 +68,6 @@ def construct(
     if lmeta is None:
         log.warning("CONSTRUCTING GEOMETRY FROM PUBLIC DATA ONLY")
         dummy_geom = PublicMetadataProxy()
-
-    # hotfix for new pylegendmeta, until a stable tag with yaml based validity is published.
-    if (
-        lmeta is not None
-        and lmeta_version.version_tuple > (1, 2, 0)
-        and os.getenv("LEGEND_METADATA", "") == ""
-    ):
-        lmeta.checkout("main")
 
     config = config if config is not None else {}
 
