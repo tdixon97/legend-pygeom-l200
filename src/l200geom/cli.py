@@ -3,8 +3,9 @@ from __future__ import annotations
 import argparse
 import logging
 
+from dbetto import utils
 from pyg4ometry import config as meshconfig
-from pygeomtools import detectors, utils, visualization, write_pygeom
+from pygeomtools import detectors, visualization, write_pygeom
 
 from . import _version, core
 

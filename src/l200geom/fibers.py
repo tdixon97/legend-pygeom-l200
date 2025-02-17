@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy as np
-from legendmeta import TextDB
+from dbetto import TextDB
 from pyg4ometry import geant4 as g4
 from pygeomtools import RemageDetectorInfo
 
