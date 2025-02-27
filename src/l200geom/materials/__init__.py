@@ -6,7 +6,10 @@ import legendoptics.fibers
 import legendoptics.lar
 import legendoptics.nylon
 import legendoptics.pen
+import legendoptics.pmts
 import legendoptics.tpb
+import legendoptics.vm2000
+import legendoptics.water
 import numpy as np
 import pint
 import pyg4ometry.geant4 as g4
@@ -40,10 +43,13 @@ class OpticalMaterialRegistry:
     def _define_elements(self) -> None:
         """Lazily define all used elements."""
         self._add_element(name="Hydrogen", symbol="H", z=1, a=1.00794)
+        self._add_element(name="Boron", symbol="B", z=5, a=10.811)
         self._add_element(name="Carbon", symbol="C", z=6, a=12.011)
         self._add_element(name="Nitrogen", symbol="N", z=7, a=14.01)
         self._add_element(name="Oxygen", symbol="O", z=8, a=16.00)
         self._add_element(name="Fluorine", symbol="F", z=9, a=19.00)
+        self._add_element(name="Sodium", symbol="Na", z=11, a=22.99)
+        self._add_element(name="Aluminium", symbol="Al", z=13, a=26.981539)
         self._add_element(name="Silicon", symbol="Si", z=14, a=28.09)
         self._add_element(name="argon", symbol="Ar", z=18, a=39.95)
         self._add_element(name="Chromium", symbol="Cr", z=24, a=51.9961)
@@ -396,3 +402,119 @@ class OpticalMaterialRegistry:
         legendoptics.pen.pyg4_pen_attach_scintillation(self._pen, self.g4_registry)
 
         return self._pen
+
+    @property
+    def water(self) -> g4.Material:
+        """High purity water of the watertank."""
+        if hasattr(self, "_water"):
+            return self._water
+
+        self._water = g4.MaterialCompound(
+            name="Water",  # written "Water" to use Geant4 intern way of handling Rayleigh scattering with water,
+            # see Geant4 BookForApplicationDevelopers pg. 270
+            density=1.0,
+            number_of_components=2,
+            registry=self.g4_registry,
+        )
+
+        self._water.add_element_natoms(self.get_element("H"), natoms=2)
+        self._water.add_element_natoms(self.get_element("O"), natoms=1)
+
+        legendoptics.water.pyg4_water_attach_rindex(self._water, self.g4_registry)
+        legendoptics.water.pyg4_water_attach_absorption(self._water, self.g4_registry)
+
+        return self._water
+
+    @property
+    def vm2000(self) -> g4.Material:
+        """Material for the reflective foil VM2000 based on nylon (e.g. MaGe)."""
+        if hasattr(self, "_vm2000"):
+            return self._vm2000
+
+        self._vm2000 = g4.MaterialCompound(
+            name="vm2000",
+            density=1.15,
+            number_of_components=4,
+            registry=self.g4_registry,
+        )
+
+        # Add elements with their mass fractions
+        self._vm2000.add_element_natoms(self.get_element("H"), natoms=2)
+        self._vm2000.add_element_natoms(self.get_element("N"), natoms=2)
+        self._vm2000.add_element_natoms(self.get_element("O"), natoms=3)
+        self._vm2000.add_element_natoms(self.get_element("C"), natoms=13)
+
+        legendoptics.vm2000.pyg4_vm2000_attach_absorption_length(self._vm2000, self.g4_registry)
+        legendoptics.vm2000.pyg4_vm2000_attach_rindex(self._vm2000, self.g4_registry)
+        legendoptics.vm2000.pyg4_vm2000_attach_wls(self._vm2000, self.g4_registry)
+        # VM2000 seem to consist of PMMA and PEN layers https://iopscience.iop.org/article/10.1088/1748-0221/12/06/P06017/pdf
+        legendoptics.pen.pyg4_pen_attach_scintillation(self._vm2000, self.g4_registry)
+        legendoptics.vm2000.pyg4_vm2000_attach_particle_scintillationyields(self._vm2000, self.g4_registry)
+
+        return self._vm2000
+
+    @property
+    def acryl(self) -> g4.Material:
+        """Material for the acryl cap of the PMT encapsulation."""
+        if hasattr(self, "_acryl"):
+            return self._acryl
+
+        self._acryl = g4.MaterialCompound(
+            name="acryl",
+            density=1.18,
+            number_of_components=2,
+            registry=self.g4_registry,
+        )
+
+        self._acryl.add_element_natoms(self.get_element("H"), natoms=2)
+        self._acryl.add_element_natoms(self.get_element("C"), natoms=1)
+
+        legendoptics.pmts.pyg4_pmt_attach_acryl_rindex(self._acryl, self.g4_registry)
+        legendoptics.pmts.pyg4_pmt_attach_acryl_absorption_length(self._acryl, self.g4_registry)
+
+        return self._acryl
+
+    @property
+    def pmt_air(self) -> g4.Material:
+        """Material for the air in between Acryl cap and PMT."""
+        if hasattr(self, "_pmt_air"):
+            return self._pmt_air
+
+        self._pmt_air = g4.MaterialCompound(
+            name="PMT_air",
+            density=0.001225,
+            number_of_components=2,
+            registry=self.g4_registry,
+        )
+
+        self._pmt_air.add_element_natoms(self.get_element("N"), natoms=3)
+        self._pmt_air.add_element_natoms(self.get_element("O"), natoms=1)
+
+        legendoptics.pmts.pyg4_pmt_attach_air_rindex(self._pmt_air, self.g4_registry)
+        legendoptics.pmts.pyg4_pmt_attach_air_absorption_length(self._pmt_air, self.g4_registry)
+
+        return self._pmt_air
+
+    @property
+    def borosilicate(self) -> g4.Material:
+        """Material for the borosilicate glass of the PMT."""
+        if hasattr(self, "_borosilicate"):
+            return self._borosilicate
+
+        self._borosilicate = g4.MaterialCompound(
+            name="borosilicate",
+            density=2.23,
+            number_of_components=4,
+            registry=self.g4_registry,
+        )
+
+        self._borosilicate.add_element_massfraction(self.get_element("Si"), 0.376)
+        self._borosilicate.add_element_massfraction(self.get_element("O"), 0.543)
+        self._borosilicate.add_element_massfraction(self.get_element("B"), 0.04)
+        self._borosilicate.add_element_massfraction(self.get_element("Na"), 0.029)
+        self._borosilicate.add_element_massfraction(self.get_element("Al"), 0.012)
+
+        legendoptics.pmts.pyg4_pmt_attach_borosilicate_rindex(self._borosilicate, self.g4_registry)
+        legendoptics.pmts.pyg4_pmt_attach_borosilicate_absorption_length(self._borosilicate, self.g4_registry)
+
+        return self._borosilicate

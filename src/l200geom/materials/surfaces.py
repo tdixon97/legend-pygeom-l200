@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import legendoptics.copper
 import legendoptics.germanium
+import legendoptics.pmts
 import legendoptics.silicon
 import legendoptics.tetratex
+import legendoptics.vm2000
 import numpy as np
 import pint
 import pyg4ometry.geant4 as g4
@@ -179,3 +181,85 @@ class OpticalSurfaceRegistry:
             self._lar_to_pen.addVecPropertyPint("SPECULARLOBECONSTANT", λ.to("eV"), specular_lobe)
 
         return self._lar_to_pen
+
+    @property
+    def to_vm2000(self) -> g4.solid.OpticalSurface:
+        """Reflective surface for VM2000."""
+        if hasattr(self, "_to_vm2000"):
+            return self._to_vm2000
+
+        # Create material properties table for VM2000 surface
+        self._to_vm2000 = g4.solid.OpticalSurface(
+            name="water_tank_foil_surface",
+            finish="polished",
+            model="unified",
+            surf_type="dielectric_metal",
+            value=0.3,
+            registry=self.g4_registry,
+        )
+
+        legendoptics.vm2000.pyg4_vm2000_attach_reflectivity(self._to_vm2000, self.g4_registry)
+        legendoptics.vm2000.pyg4_vm2000_attach_efficiency(self._to_vm2000, self.g4_registry)
+
+        return self._to_vm2000
+
+    @property
+    def water_to_vm2000(self) -> g4.solid.OpticalSurface:
+        """Optical surface between water and VM2000."""
+        if hasattr(self, "_water_to_vm2000"):
+            return self._water_to_vm2000
+
+        # Create material properties table for VM2000 border surface
+        self._water_to_vm2000 = g4.solid.OpticalSurface(
+            name="WaterTankFoilBorder",
+            finish="polished",
+            model="unified",
+            surf_type="dielectric_metal",
+            value=0.3,
+            registry=self.g4_registry,
+        )
+
+        legendoptics.vm2000.pyg4_vm2000_attach_border_params(self._water_to_vm2000, self.g4_registry)
+
+        return self._water_to_vm2000
+
+    @property
+    def to_pmt_steel(self) -> g4.solid.OpticalSurface:
+        """Optical surface of steel."""
+        if hasattr(self, "_to_pmt_steel"):
+            return self._to_pmt_steel
+
+        self._to_pmt_steel = g4.solid.OpticalSurface(
+            name="pmt_steel_surface",
+            finish="polished",
+            model="unified",
+            surf_type="dielectric_metal",
+            value=0.3,
+            registry=self.g4_registry,
+        )
+
+        legendoptics.pmts.pyg4_pmt_attach_steel_reflectivity(self._to_pmt_steel, self.g4_registry)
+        legendoptics.pmts.pyg4_pmt_attach_steel_efficiency(self._to_pmt_steel, self.g4_registry)
+
+        return self._to_pmt_steel
+
+    @property
+    def to_photocathode(self) -> g4.solid.OpticalSurface:
+        """Optical surface of the PMT photocathode."""
+        if hasattr(self, "_to_photocathode"):
+            return self._to_photocathode
+
+        # Detector Surface
+        self._to_photocathode = g4.solid.OpticalSurface(
+            name="pmt_cathode_surface",
+            finish="polished",
+            model="unified",
+            surf_type="dielectric_metal",
+            value=0.01,
+            registry=self.g4_registry,
+        )
+
+        legendoptics.pmts.pyg4_pmt_attach_photocathode_reflectivity(self._to_photocathode, self.g4_registry)
+        legendoptics.pmts.pyg4_pmt_attach_photocathode_efficiency(self._to_photocathode, self.g4_registry)
+
+        return self._to_photocathode
