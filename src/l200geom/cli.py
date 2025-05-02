@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 def dump_gdml_cli(argv: list[str] | None = None) -> None:
     args, config = _parse_cli_args(argv)
 
+    logging.basicConfig()
     if args.verbose:
         logging.getLogger("l200geom").setLevel(logging.DEBUG)
     if args.debug:
