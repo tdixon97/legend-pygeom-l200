@@ -398,7 +398,10 @@ def _get_support_structure(
     .. note :: Both models' coordinate origins are a the top face of the tristar structure."""
     if "hpge_support_copper_string_support_structure" not in b.registry.logicalVolumeDict:
         support_lv = _read_model(
-            "StringSupportStructure.stl", "hpge_support_copper_string_support_structure", b.materials.metal_copper, b
+            "StringSupportStructure.stl",
+            "hpge_support_copper_string_support_structure",
+            b.materials.metal_copper,
+            b,
         )
         if support_lv is not None:
             support_lv.pygeom_color_rgba = (0.72, 0.45, 0.2, 1)
@@ -407,7 +410,9 @@ def _get_support_structure(
 
     tristar_lv_name = f"hpge_support_copper_tristar_{size}"
     if tristar_lv_name not in b.registry.logicalVolumeDict:
-        tristar_lv = _read_model(f"TriStar_{size}.stl", f"hpge_support_copper_tristar_{size}", b.materials.metal_copper, b)
+        tristar_lv = _read_model(
+            f"TriStar_{size}.stl", f"hpge_support_copper_tristar_{size}", b.materials.metal_copper, b
+        )
         if tristar_lv is not None:
             tristar_lv.pygeom_color_rgba = (0.72, 0.45, 0.2, 1)
     else:
