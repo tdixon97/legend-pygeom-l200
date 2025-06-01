@@ -410,9 +410,7 @@ def _get_support_structure(
 
     tristar_lv_name = f"hpge_support_copper_tristar_{size}"
     if tristar_lv_name not in b.registry.logicalVolumeDict:
-        tristar_lv = _read_model(
-            f"TriStar_{size}.stl", f"hpge_support_copper_tristar_{size}", b.materials.metal_copper, b
-        )
+        tristar_lv = _read_model(f"TriStar_{size}.stl", tristar_lv_name, b.materials.metal_copper, b)
         if tristar_lv is not None:
             tristar_lv.pygeom_color_rgba = (0.72, 0.45, 0.2, 1)
     else:
