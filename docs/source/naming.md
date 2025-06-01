@@ -15,9 +15,9 @@ volumes, materials, surfaces, ...).
   - python variables names are not generally expected to follow the geometry
     names, but should if possible.
   - volume names should be prefixed with a descriptive name of the overall
-  system, for example `fibers-inner` for fibers in the inner barrel, or 
-  `pen` for pen-plates. This is to enabled simple wildcards to select
-  all volumes of the same type in _re
+    system, for example `fibers-inner` for fibers in the inner barrel, or `pen`
+    for pen-plates. This is to enabled simple wildcards to select all volumes of
+    the same type in \_re
 - **surfaces**
   - `surface_{from}_to_{to}` for OpticalSurfaces (property definition)
   - `bsurface_{from}_{to}` for border surfaces `* ssurface_{to}` for skin
@@ -25,5 +25,3 @@ volumes, materials, surfaces, ...).
 - **materials**
   - snake_case similar to volumes, e.g. `metal_copper`.
   - Elements use capitalized names, e.g. `Hydrogen`
-
-
