@@ -161,5 +161,5 @@ def test_special(change_dir, tmp_path):
 
     # we should have only short hangers and wrapped counterweights.
     assert "counterweight_wrapped" in reg.solidDict
-    assert "string_support_structure_short" in reg.logicalVolumeDict
-    assert "string_support_structure" not in reg.logicalVolumeDict
+    assert "hpge_support_copper_string_support_structure_short" in reg.logicalVolumeDict
+    assert "hpge_support_copper_string_support_structure" not in reg.logicalVolumeDict
