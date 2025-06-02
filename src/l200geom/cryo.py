@@ -158,4 +158,8 @@ def place_argon(
 ) -> g4.PhysicalVolume:
     lar_pv = g4.PhysicalVolume([0, 0, 0], [0, 0, cryostat_displacement_z], lar_lv, "lar", cryostat_lv, reg)
     lar_lv.pygeom_color_rgba = [0, 0, 0, 0.03]
+
+    # set lar as active with det id 0
+    lar_pv.set_pygeom_active_detector(RemageDetectorInfo("scintillator", 0, {}))
+
     return lar_pv
